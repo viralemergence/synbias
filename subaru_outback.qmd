@@ -1,0 +1,153 @@
+---
+title: "Subaru Outback Test"
+author: "July Pilowsky"
+format: pdf
+---
+
+```{r setup, echo = F, include=F}
+library(tidyverse)
+library(scales)
+library(paletteer)
+library(cowplot)
+theme_set(theme_cowplot())
+```
+
+# What This Test Does
+
+The scenario is that there are two viruses, A and B, that cause permanent infection. Infection comes from environmental sources only. There are two scenarios: *facilitation*, in which the strains each facilitate infection with the other, and *competition*, in which each strain suppresses infection with the other. The facilitation and competition are both symmetrical.
+
+The host population has variation in body condition, C, which determines individual probability of acquiring an infection from environmental sources. Once an individual has been infected with a strain, subsequent exposure to that strain has no effect. At the beginning of the simulation, none of the hosts are infected. There is no demography (closed static population.)
+
+# Setup
+
+For both scenarios, the starting host population is the same. I will represent the host population as a matrix with one row for each individual and three columns: one that contains the body condition, C, one that indicates infection with strain A (0 or 1), and one that indicates infection with strain B (0 or 1). C is randomly drawn from a uniform distribution 0 to 1. A higher number indicates poorer body condition (higher probability of becoming infected.)
+
+```{r host population}
+host_pop <- matrix(c(runif(1000, 0, 0.3), rep(0, 2000)), ncol = 3) %>% list()
+```
+
+For the *competition* scenario, I will assign a multiplier, M, less than 1 to decrease the probability of transmission of strain A when infected with strain B and vice versa. For the *facilitation* scenario, M \> 1.
+
+```{r multipliers}
+m_competition <- 0.8
+m_facilitation <- 1.2
+```
+
+# Simulation
+
+For this test, I will simulate each scenario for 100 time steps. Here is the *competition* scenario.
+
+```{r competition scenario}
+host_pop1 <- host_pop
+timesteps <- 1:100
+for (t in timesteps) {
+  pop_t <- host_pop1[[t]]
+  pop_t[,2] <- map_lgl(array_branch(pop_t, 1), function(m) {
+    if (m[2]) {
+      TRUE
+    } else if (m[3]) {
+      rbinom(1, 1, m[1]*m_competition)
+    } else {
+      rbinom(1, 1, m[1])
+    }
+  })
+  pop_t[,3] <- map_lgl(array_branch(pop_t, 1), function(m) {
+    if (m[3]) {
+      TRUE
+    } else if (m[2]) {
+      rbinom(1, 1, m[1]*m_competition)
+    } else {
+      rbinom(1, 1, m[1])
+    }
+  })
+  host_pop1[[t + 1]] <- pop_t
+}
+competition_scenario <- host_pop1 %>% map(colSums) %>% 
+  map(~set_names(., c("x", "A", "B"))) %>% 
+  bind_rows() %>% 
+  select(-x) %>% mutate(Timestep = 1:101)
+competition_scenario %>% 
+  ggplot(aes(x = Timestep)) +
+  geom_line(col = "#F3AA4FFF", aes(y = A), linewidth = 1.1, alpha = 0.6) +
+  geom_line(col = "#54C4E3FF", aes(y = B), linewidth = 1.1, alpha = 0.6) +
+  ylab("Cases") +
+  ggtitle("Competition")
+```
+
+The two strains are shown here with different colored lines, but since the competition is symmetrical, it's almost impossible to distinguish them.
+
+Now let's try facilitation.
+
+```{r facilitation scenario}
+host_pop2 <- matrix(c(runif(1000), rep(0, 2000)), ncol = 3) %>% list()
+timesteps <- 1:100
+for (t in timesteps) {
+  pop_t <- host_pop2[[t]]
+  pop_t[,2] <- map_lgl(array_branch(pop_t, 1), function(m) {
+    if (m[2]) {
+      TRUE
+    } else if (m[3]) {
+      rbinom(1, 1, squish(m[1]*m_facilitation))
+    } else {
+      rbinom(1, 1, m[1])
+    }
+  })
+  pop_t[,3] <- map_lgl(array_branch(pop_t, 1), function(m) {
+    if (m[3]) {
+      TRUE
+    } else if (m[2]) {
+      rbinom(1, 1, squish(m[1]*m_facilitation))
+    } else {
+      rbinom(1, 1, m[1])
+    }
+  })
+  host_pop2[[t + 1]] <- pop_t
+}
+facilitation_scenario <- host_pop2 %>% map(colSums) %>% 
+  map(~set_names(., c("x", "A", "B"))) %>% 
+  bind_rows() %>% 
+  select(-x) %>% mutate(Timestep = 1:101) 
+facilitation_scenario %>% 
+  ggplot(aes(x = Timestep)) +
+  geom_line(col = "#F3AA4FFF", aes(y = A), linewidth = 1.1, alpha = 0.6) +
+  geom_line(col = "#54C4E3FF", aes(y = B), linewidth = 1.1, alpha = 0.6) +
+  ylab("Cases") +
+  ggtitle("Facilitation")
+```
+
+We can summarize the difference between the two scenarios by measuring how many timesteps it takes for half the population to become infected with both strains:
+
+```{r summary metrics}
+host_pop %>% map(function(m) {
+  m[,2] & m[,3]
+}) %>% map_int(sum) %>% map_lgl(~.>500) %>% 
+  which.max() %>% set_names("competition")
+host_pop2 %>% map(function(m) {
+  m[,2] & m[,3]
+}) %>% map_int(sum) %>% map_lgl(~.>500) %>% 
+  which.max() %>% set_names("facilitation")
+```
+
+# Sampling
+
+We are interested in how these interactive effects change what you observe in a disease system when you sample. So let's look at each scenario sampled at timestep 10 and timestep 50. This is a case of perfect sampling, where the whole population is surveyed at each timepoint and the test used is totally accurate.
+
+```{r perfect sampling}
+list(host_pop1, host_pop2) %>% 
+  map(~map(., as.data.frame)) %>% 
+  map(~map(., ~set_names(., c("x", "A", "B")))) %>% 
+  map(~map(., ~mutate(., AB = A + B == 2, A_only = A & !B, B_only = B & !A, neg = A + B == 0))) %>% 
+  map(~.[c(10, 50)]) %>% 
+  map(bind_rows) %>% 
+  map(~mutate(., Timestep = c(rep(10, 1000), rep(50, 1000)))) %>% 
+  bind_rows() %>% 
+  mutate(Scenario = c(rep("Competition", 2000), rep("Facilitation", 2000))) %>% 
+  group_by(Scenario, Timestep) %>% 
+  summarize(AB = sum(AB), A = sum(A_only), B = sum(B_only), Negative = sum(neg)) %>% 
+  pivot_longer(AB:Negative, names_to = "Infection_Status", values_to = "Count") %>% 
+  ggplot(aes(x = Scenario, y = Count, fill = Infection_Status)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~Timestep) +
+  scale_fill_paletteer_d("fishualize::Coryphaena_hippurus", 
+                         name = "Infection\nStatus")
+```

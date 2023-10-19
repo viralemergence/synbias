@@ -1,0 +1,145 @@
+---
+title: "Ferrari Test"
+author: "July Pilowsky"
+format: pdf
+---
+
+```{r setup, echo = F, include = F}
+library(tidyverse)
+library(scales)
+library(paletteer)
+library(cowplot)
+theme_set(theme_cowplot())
+set.seed(54)
+```
+
+# What This Test Does
+
+The scenario is that there are two viruses, A and B, that cause permanent infection. Infection is through frequency-dependent direct transmission. There are two scenarios: *facilitation*, in which the strains each facilitate infection with the other, and *competition*, in which each strain suppresses infection with the other. The facilitation and competition are both symmetrical.
+
+The host population is 1000 individuals. I will start with two infected individuals: one with strain A, and one with strain B. I could use differential equations for this but I will do it discretely with demographic stochasticity (though there will be no demography in this population.)
+
+# Setup
+
+For both scenarios, the starting host population is the same. I will represent the host population as a named vector representing 4 population compartments: susceptible individuals, S; those infected with strain A only, I~a~; those infected with strain B only, I~b~; and those infected with both, I~ab~.
+
+```{r initial population}
+init <- c(S = 998, Ia = 1, Ib = 1, Iab = 0)
+```
+
+I will create a set of parameters with 𝛃~S~ (transmission of both strains to susceptibles) and 𝛃~I~ (transmission of each strain to those infected with the other.) For the *competition* scenario, 𝛃~S~ \> 𝛃~I~, and for the *facilitation* scenario, 𝛃~S~ \< 𝛃~I~.
+
+```{r scenario parms}
+competition_params <- c(beta_s = 0.0003, beta_i = 0.0002)
+facilitation_params <- c(beta_s = 0.0003, beta_i = 0.0004)
+```
+
+# Simulation
+
+Here is the function I will use for simulations.
+
+```{r simulation function}
+ferrari <- function(initial_vector, params, timesteps) {
+  # Unpack parameters
+  beta_s <- params["beta_s"]
+  beta_i <- params["beta_i"]
+  
+  # Set up population vector
+  state_list <- c(list(initial_vector), replicate(timesteps, c(
+    S = NA,
+    Ia = NA,
+    Ib = NA,
+    Iab = NA
+  ), simplify = F))
+  
+  for (t in 1:timesteps) {
+    
+    # Unpack states
+    S <- state_list[[t]]["S"]
+    Ia <- state_list[[t]]["Ia"]
+    Ib <- state_list[[t]]["Ib"]
+    Iab <- state_list[[t]]["Iab"]
+    
+    if (Iab == 1000) {
+      state_list[[t + 1]] <- state_list[[t]]
+    } else {
+      # State changes
+      infection_s_a <- rbinom(1, S*(Ia + Iab), beta_s)
+      infection_s_b <- rbinom(1, S*(Ib + Iab), beta_s)
+      infection_a_ab <- rbinom(1, Ia*(Ib + Iab), beta_i)
+      infection_b_ab <- rbinom(1, Ib*(Ia + Iab), beta_i)
+      infection_s <- infection_s_a + infection_s_b
+      if (infection_s > S) {
+        ratio <- infection_s_a/(infection_s_a + infection_s_b)
+        infection_s_a <- round(S*ratio)
+        infection_s_b <- round(S*(1-ratio))
+      }
+      if (infection_b_ab > Ib) {
+        infection_b_ab <- Ib
+      }
+      if (infection_a_ab > Ia) {
+        infection_a_ab <- Ia
+      }
+      
+      # Store new states
+      state_list[[t + 1]]["S"] <- S - infection_s_a - infection_s_b
+      state_list[[t + 1]]["Ia"] <- Ia + infection_s_a - infection_a_ab
+      state_list[[t + 1]]["Ib"] <- Ib + infection_s_b - infection_b_ab
+      state_list[[t + 1]]["Iab"] <- Iab + infection_a_ab + infection_b_ab
+    }
+  }
+  
+  df <- state_list %>% bind_rows() %>% rowid_to_column("Timestep")
+  return(df)
+}
+```
+
+Here I use it for the *competition* scenario.
+
+```{r competition scenario}
+competition_df <- ferrari(init, competition_params, 100)
+competition_df %>% 
+  pivot_longer(S:Iab, names_to = "State", values_to = "Count") %>% 
+  ggplot(aes(x = Timestep, y = Count, group = State)) +
+  geom_line(aes(col = State), linewidth = 1.05) +
+  scale_color_paletteer_d(`"fishualize::Coryphaena_hippurus"`) +
+  theme_minimal() +
+  ggtitle("Competition")
+```
+
+And here is the *facilitation* scenario.
+
+```{r facilitation scenario}
+facilitation_df <- ferrari(init, facilitation_params, 100)
+facilitation_df %>% 
+  pivot_longer(S:Iab, names_to = "State", values_to = "Count") %>% 
+  ggplot(aes(x = Timestep, y = Count, group = State)) +
+  geom_line(aes(col = State), linewidth = 1.05) +
+  scale_color_paletteer_d(`"fishualize::Coryphaena_hippurus"`) +
+  theme_minimal() +
+  ggtitle("Facilitation")
+```
+
+Once again, I can summarize the differences between the scenarios by comparing how many timesteps it takes to get to half the population infected with both strains:
+
+```{r summary metric}
+competition_df %>% pull(Iab) %>% map_lgl(~.>500) %>% which.max() %>% 
+  set_names("competition")
+facilitation_df %>% pull(Iab) %>% map_lgl(~.>500) %>% which.max() %>% 
+  set_names("facilitation")
+```
+
+# Sampling
+
+We are interested in how these interactive effects change what you observe in a disease system when you sample. So let's look at each scenario sampled at timestep 20 and timestep 40. This is a case of perfect sampling, where the whole population is surveyed at each timepoint and the test used is totally accurate.
+
+```{r perfect sampling}
+competition_df[c(20,40),] %>% mutate(Scenario = "Competition") %>% 
+  bind_rows(facilitation_df[c(20,40),] %>% mutate(Scenario = "Facilitation")) %>% 
+  pivot_longer(S:Iab, names_to = "Infection_Status", values_to = "Count") %>% 
+  ggplot(aes(x = Scenario, y = Count, fill = Infection_Status)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~Timestep) +
+  scale_fill_paletteer_d("fishualize::Coryphaena_hippurus", 
+                         name = "Infection\nStatus")
+```

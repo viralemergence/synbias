@@ -10,7 +10,7 @@ library(scales)
 library(paletteer)
 library(cowplot)
 theme_set(theme_cowplot())
-set.seed(54)
+set.seed(185)
 ```
 
 # What This Test Does
@@ -142,4 +142,105 @@ competition_df[c(20,40),] %>% mutate(Scenario = "Competition") %>%
   facet_wrap(~Timestep) +
   scale_fill_paletteer_d("fishualize::Coryphaena_hippurus", 
                          name = "Infection\nStatus")
+```
+
+# The Multi-Species Case
+
+Now I will adapt this model so it can take any number of species. To do this, I will first need to generate a matrix of interactions among strains: multipliers that modify transmission parameters.
+
+```{r interaction matrix}
+beta_s <- 0.0003
+interactions <- runif(25, 0.5, 1.5) |> matrix(nrow = 5)
+diag(interactions) <- 1
+interactions
+```
+
+We also need to store the initial population in a matrix that can keep track of which strains the population has or doesn't have. I include one individual infected with each of the five strains.
+
+```{r initial population 2}
+initial_pop <- c(rep(c(1, rep(0, 5)), 5), rep(0, 4970)) |> 
+  matrix(nrow = 1000, byrow = T)
+```
+
+Here is a simulation function that can handle any number of strains with an interaction matrix, assuming their baseline transmission rate is the same:
+
+```{r simulation function 2}
+ferrari <- function(initial_pop,
+                    interactions,
+                    beta_s,
+                    timesteps) {
+  # Set up population list
+  state_list <-
+    c(list(), replicate(timesteps, matrix(
+      0,
+      ncol = ncol(initial_pop),
+      nrow = nrow(initial_pop)
+    ), simplify = FALSE))
+  state_list[[1]] <- initial_pop
+  
+  for (t in 1:(timesteps - 1)) {
+    current_pop <- state_list[[t]]
+    col_sums <- colSums(current_pop)
+    
+    if (sum(col_sums) == length(current_pop)) {
+      state_list[[t + 1]] <- current_pop
+    } else {
+      indiv <- array_branch(current_pop, 1)
+      
+      total_strains <- map_dbl(indiv, ~ sum(.x))
+      
+      indiv_new <- map(1:length(indiv), \(i) {
+        indiv_prev <- indiv[[i]]
+        int_indiv <- interactions[as.logical(indiv_prev),]
+        
+        indiv_new <- map_dbl(1:length(indiv_prev), \(column) {
+          if (total_strains[i] > 1) {
+            pmax(indiv_prev[column],
+                 rbinom(
+                   1,
+                   col_sums[column],
+                   int_indiv[, column] |>
+                     Reduce(`*`, x = _) |> (`*`)(beta_s)
+                 ))
+          } else if (total_strains[i] == 1) {
+            pmax(indiv_prev[column],
+                 rbinom(1,
+                        col_sums[column],
+                        int_indiv[column] |> (`*`)(beta_s)))
+          } else {
+            rbinom(1, col_sums[column], beta_s)
+          }
+        })
+        
+        matrix(pmax(indiv_prev, indiv_new |> map_dbl(\(x) {
+          ifelse(x > 1, 1, x)
+        })), nrow = 1)
+      })
+      
+      state_list[[t + 1]] <-
+        matrix(unlist(indiv_new),
+               nrow = nrow(current_pop),
+               byrow = T)
+    }
+  }
+  
+  
+  df <- state_list |> map(colSums) |>
+    map(\(x) {
+      set_names(x, LETTERS[1:ncol(initial_pop)])
+    }) |>
+    bind_rows() |>
+    rowid_to_column("Timestep")
+  return(df)
+}
+```
+
+Now I will try out my randomly generated interaction matrix.
+
+```{r five strain test}
+five_strain <- ferrari(initial_pop, interactions, beta_s, 100)
+five_strain |> pivot_longer(A:E, names_to = "Strain", values_to = "Cases") |> 
+  ggplot(aes(x = Timestep, y = Cases, group = Strain)) +
+  geom_line(aes(col = Strain), linewidth = 1.05, alpha = 0.7) +
+  scale_color_paletteer_d("dichromat::Categorical_12", -1)
 ```

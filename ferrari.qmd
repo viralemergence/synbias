@@ -9,7 +9,10 @@ library(tidyverse)
 library(scales)
 library(paletteer)
 library(cowplot)
+library(Rcpp)
+library(RcppArmadillo)
 theme_set(theme_cowplot())
+sourceCpp("ferrari.cpp")
 set.seed(185)
 ```
 
@@ -39,7 +42,7 @@ facilitation_params <- c(beta_s = 0.0003, beta_i = 0.0004)
 Here is the function I will use for simulations.
 
 ```{r simulation function}
-ferrari <- function(initial_vector, params, timesteps) {
+ferrari_two <- function(initial_vector, params, timesteps) {
   # Unpack parameters
   beta_s <- params["beta_s"]
   beta_i <- params["beta_i"]
@@ -97,7 +100,7 @@ ferrari <- function(initial_vector, params, timesteps) {
 Here I use it for the *competition* scenario.
 
 ```{r competition scenario}
-competition_df <- ferrari(init, competition_params, 100)
+competition_df <- ferrari_two(init, competition_params, 100)
 competition_df %>% 
   pivot_longer(S:Iab, names_to = "State", values_to = "Count") %>% 
   ggplot(aes(x = Timestep, y = Count, group = State)) +
@@ -110,7 +113,7 @@ competition_df %>%
 And here is the *facilitation* scenario.
 
 ```{r facilitation scenario}
-facilitation_df <- ferrari(init, facilitation_params, 100)
+facilitation_df <- ferrari_two(init, facilitation_params, 100)
 facilitation_df %>% 
   pivot_longer(S:Iab, names_to = "State", values_to = "Count") %>% 
   ggplot(aes(x = Timestep, y = Count, group = State)) +
@@ -150,22 +153,23 @@ Now I will adapt this model so it can take any number of species. To do this, I 
 
 ```{r interaction matrix}
 beta_s <- 0.0003
-interactions <- runif(25, 0.5, 1.5) |> matrix(nrow = 5)
+interactions <- runif(15*15, 0.5, 1.5) |> matrix(nrow = 15)
 diag(interactions) <- 1
 interactions
 ```
 
-We also need to store the initial population in a matrix that can keep track of which strains the population has or doesn't have. I include one individual infected with each of the five strains.
+We also need to store the initial population in a matrix that can keep track of which strains the population has or doesn't have. I include one individual infected with each of the fifteen strains.
 
 ```{r initial population 2}
-initial_pop <- c(rep(c(1, rep(0, 5)), 5), rep(0, 4970)) |> 
+initial_pop <- c(rep(c(1, rep(0, 15)), 15), 
+                 rep(0, 14760)) |> 
   matrix(nrow = 1000, byrow = T)
 ```
 
-Here is a simulation function that can handle any number of strains with an interaction matrix, assuming their baseline transmission rate is the same:
+I have written in C++ a simulation function that can handle any number of strains with an interaction matrix, assuming their baseline transmission rate is the same. Here is the R version of the C++ code, which I will not use because it is orders of magnitude slower:
 
 ```{r simulation function 2}
-ferrari <- function(initial_pop,
+ferrari_r <- function(initial_pop,
                     interactions,
                     beta_s,
                     timesteps) {
@@ -238,9 +242,40 @@ ferrari <- function(initial_pop,
 Now I will try out my randomly generated interaction matrix.
 
 ```{r five strain test}
-five_strain <- ferrari(initial_pop, interactions, beta_s, 100)
-five_strain |> pivot_longer(A:E, names_to = "Strain", values_to = "Cases") |> 
+fifteen_strain <- ferrari(initial_pop = initial_pop, 
+                       interactions = interactions, 
+                       beta_s = beta_s, timesteps = 100)
+fifteen_strain |> 
+  array_branch(3) |> 
+  map(colSums) |>
+  map(\(x) {
+    set_names(x, LETTERS[1:ncol(initial_pop)])
+  }) |>
+  bind_rows() |>
+  rowid_to_column("Timestep") |> 
+  pivot_longer(A:O, names_to = "Strain", values_to = "Cases") |> 
   ggplot(aes(x = Timestep, y = Cases, group = Strain)) +
   geom_line(aes(col = Strain), linewidth = 1.05, alpha = 0.7) +
-  scale_color_paletteer_d("dichromat::Categorical_12", -1)
+  scale_color_paletteer_d("awtools::bpalette")
 ```
+
+Now I want to simulate imperfect sampling to see what happens with species richness. I will randomly sample 100 of the 1000 individuals in the population, and give these samples false negatives with a low probability. The result will show how many positives we get for each of the fifteen strains.
+
+```{r imperfect sampling}
+fifteen_strain |> _[, , 1:25] |> array_branch(3) |> 
+  map(\(m) {
+    m[sample(1000, 100),]
+  }) |> 
+  map(\(m) {
+    m[sample(100, 4), sample(15, 4)] <- 0
+    return(m)
+  }) |> map(colSums) |> 
+  map(\(v) {map_lgl(v, \(v) v > 0)}) |> map_dbl(sum) |> 
+  imap(cbind.data.frame) |> 
+  map(set_names, nm = c("Richness", "Timestep")) |> 
+  bind_rows() |> 
+  ggplot(data = _, aes(x = Timestep, y = Richness)) + geom_line() +
+  geom_hline(yintercept = 15, linetype = "dashed")
+```
+
+We can see here that it takes a while to reach the correct richness estimate of 15 strains.

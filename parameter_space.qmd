@@ -1,0 +1,33 @@
+---
+title: "Exploring the Parameter Space"
+author: "July Pilowsky"
+---
+
+```{r setup, echo = F, include = F}
+library(tidyverse)
+library(scales)
+library(paletteer)
+library(cowplot)
+library(Rcpp)
+library(RcppArmadillo)
+theme_set(theme_cowplot())
+sourceCpp("ferrari.cpp")
+source("lhs.R")
+source("simulation_functions.R")
+set.seed(185)
+```
+
+# The Parameter Space
+
+I am exploring the parameter space in four ways. I am exploring the effects of interaction strength, ratio of competitive to facilitative interactions, number of strains, and presence/absence of priority effects.
+
+Aspects of simulations I am *not* changing are the population size, number of time steps, baseline transmission rate, or method of imperfect sampling.
+
+# Simulation
+
+```{r simulate}
+imperfect_samples <- sample_data %>% rowwise() %>% group_split() %>% 
+  map(df_to_inputs) %>% 
+  map(\(x) ferrari(x$initial_pop, x$interactions, 2e-04, 100)) %>% 
+  map(disease_sample, prop = 0.1, imperfect_assays = FALSE)
+```

@@ -10,11 +10,12 @@ library(paletteer)
 library(cowplot)
 library(Rcpp)
 library(RcppArmadillo)
+library(furrr)
 theme_set(theme_cowplot())
-sourceCpp("ferrari.cpp")
 source("lhs.R")
 source("simulation_functions.R")
 set.seed(185)
+simulation <- TRUE
 ```
 
 # The Parameter Space
@@ -26,8 +27,18 @@ Aspects of simulations I am *not* changing are the population size, number of ti
 # Simulation
 
 ```{r simulate}
-imperfect_samples <- sample_data %>% rowwise() %>% group_split() %>% 
-  map(df_to_inputs) %>% 
-  map(\(x) ferrari(x$initial_pop, x$interactions, 2e-04, 100)) %>% 
-  map(disease_sample, prop = 0.1, imperfect_assays = FALSE)
+if (simulation) {
+  plan(multisession, workers = 15)
+  imperfect_samples <-
+    sample_data %>% rowwise() %>% group_split() %>%
+    map(df_to_inputs) %>%
+    future_map(\(x) {
+      sourceCpp("ferrari.cpp")
+      mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
+      disease_sample(mat, prop = 0.1, imperfect_assays = FALSE)
+    }, .progress = T, seed = NULL)
+  results <- sample_data %>%
+    mutate(richness_count = map_dbl(imperfect_samples, sum))
+  write_csv(results, "simulation_round1.csv")
+}
 ```

@@ -15,7 +15,7 @@ theme_set(theme_cowplot())
 source("lhs.R")
 source("simulation_functions.R")
 set.seed(185)
-simulation <- TRUE
+simulation <- FALSE
 ```
 
 # The Parameter Space
@@ -40,5 +40,49 @@ if (simulation) {
   results <- sample_data %>%
     mutate(richness_count = map_dbl(imperfect_samples, sum))
   write_csv(results, "simulation_round1.csv")
+} else {
+  results <- read_csv("simulation_round1.csv", show_col_types = F)
 }
+head(results)
+```
+
+# Visualization
+
+```{r strains}
+ggplot(results, aes(x = strains, y = richness_count, col = cf_ratio)) +
+  geom_point() +
+  scale_color_paletteer_c("scico::vikO", name = "C:F Ratio") +
+  xlab("True Strain Number") +
+  ylab("Measured Strain Number") +
+  ggtitle("True vs. Measured Viral Richness")
+results |> 
+  mutate(underestimate = richness_count/strains*100) |> 
+  ggplot(aes(x = strains, y = underestimate, col = cf_ratio)) +
+  geom_point() +
+  scale_color_paletteer_c("scico::vikO", name = "C:F Ratio") +
+  xlab("Strain Number") +
+  ylab("% Underestimate of True Richness") +
+  ggtitle("Effect of Strain Number on Bias")
+```
+
+```{r interaction strength}
+results |> mutate(underestimate = richness_count/strains*100) |> 
+  ggplot(aes(x = cf_ratio, y = underestimate, col = interaction_strength)) +
+  scale_color_paletteer_c("scico::oslo", direction = -1, 
+                          name = "Interaction\nStrength") +
+  geom_point() +
+  xlab("C:F Ratio") +
+  ylab("% Underestimate of True Richness") +
+  ggtitle("Effect of Interaction Strength on Bias")
+```
+
+```{r priority effects}
+results |> mutate(underestimate = richness_count/strains*100) |> 
+  ggplot(aes(x = priority_effects, y = underestimate, 
+             fill = priority_effects)) +
+  scale_fill_paletteer_d("nbapalettes::heat_vice") +
+  geom_violin() +
+  xlab("Priority Effects") +
+  ylab("% Underestimate of True Richness") +
+  theme(legend.position = "none")
 ```

@@ -18,13 +18,13 @@ set.seed(185)
 simulation <- FALSE
 ```
 
-# The Parameter Space
+# Round 1
 
 I am exploring the parameter space in four ways. I am exploring the effects of interaction strength, ratio of competitive to facilitative interactions, number of strains, and presence/absence of priority effects.
 
 Aspects of simulations I am *not* changing are the population size, number of time steps, baseline transmission rate, or method of imperfect sampling.
 
-# Simulation
+## Simulation
 
 ```{r simulate}
 if (simulation) {
@@ -86,3 +86,61 @@ results |> mutate(underestimate = richness_count/strains*100) |>
   ylab("% Underestimate of True Richness") +
   theme(legend.position = "none")
 ```
+
+## Figures
+
+# Rounds 2 and 3
+
+Round 1 went well, but there are some new factors we want to consider in another round of modeling. One is to explore higher numbers of strains (the last round was capped at 100.) Another is to explore interactions between sampling proportion (percent of population sampled) and different interaction schemes among strains. I will address this with two new rounds of modeling, shown here:
+
+```{r round 2 and 3 data}
+library(poems)
+synbias_lhs <- LatinHypercubeSampler$new()
+synbias_lhs$set_uniform_parameter("interaction_strength", 0, 0.75)
+synbias_lhs$set_class_parameter("priority_effects", c(TRUE, FALSE))
+synbias_lhs$set_uniform_parameter("cf_ratio")
+synbias_lhs$set_uniform_parameter("strains", 100, 200, decimals = 0)
+sample_data2 <- synbias_lhs$generate_samples(10000, random_seed = 198) %>%
+  rowid_to_column("id")
+synbias_lhs$set_uniform_parameter("strains", 10, 200, decimals = 0)
+synbias_lhs$set_uniform_parameter("sample_prop", 0.01, 1)
+sample_data3 <- synbias_lhs$generate_samples(10000, random_seed = 198) %>%
+  rowid_to_column("id")
+```
+
+## Simulation
+
+```{r round 2 and 3 simulations}
+if (simulation) {
+  plan(multisession, workers = 15)
+  imperfect_samples <-
+    sample_data2 %>% rowwise() %>% group_split() %>%
+    map(df_to_inputs) %>%
+    future_map(\(x) {
+      sourceCpp("ferrari.cpp")
+      mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
+      disease_sample(mat, prop = 0.1, imperfect_assays = FALSE)
+    }, .progress = T, seed = NULL)
+  results2 <- sample_data2 %>%
+    mutate(richness_count = map_dbl(imperfect_samples, sum))
+  write_csv(results2, "simulation_round2.csv")
+  rm(imperfect_samples) # release from memory
+  inputs <- sample_data3 |> rowwise() |> 
+    group_split() |> map(df_to_inputs)
+  imperfect_samples <- future_map(sample_data3$id, \(i) {
+    sourceCpp("ferrari.cpp")
+    mat <- ferrari(inputs[[i]]$initial_pop, inputs[[i]]$interactions, 2e-04,
+                   100)
+    disease_sample(mat, prop = sample_data3$sample_prop[i],
+                   imperfect_assays = FALSE)
+  })
+  results3 <- sample_data3 |> 
+              mutate(richness_count = map_dbl(imperfect_samples, sum))
+  write_csv(results3, "simulation_round3.csv")
+} else {
+  results2 <- read_csv("simulation_round2.csv")
+  results3 <- read_csv("simulation_round3.csv")
+}
+```
+
+## Figures

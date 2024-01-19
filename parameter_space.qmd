@@ -11,11 +11,13 @@ library(cowplot)
 library(Rcpp)
 library(RcppArmadillo)
 library(furrr)
+library(tictoc)
 theme_set(theme_cowplot())
 source("lhs.R")
 source("simulation_functions.R")
 set.seed(185)
-simulation <- FALSE
+simulation <- TRUE
+options(future.globals.maxSize= 9967869120)
 ```
 
 # Round 1
@@ -46,7 +48,7 @@ if (simulation) {
 head(results)
 ```
 
-# Visualization
+## Visualization
 
 ```{r strains}
 ggplot(results, aes(x = strains, y = richness_count, col = cf_ratio)) +
@@ -87,8 +89,6 @@ results |> mutate(underestimate = richness_count/strains*100) |>
   theme(legend.position = "none")
 ```
 
-## Figures
-
 # Rounds 2 and 3
 
 Round 1 went well, but there are some new factors we want to consider in another round of modeling. One is to explore higher numbers of strains (the last round was capped at 100.) Another is to explore interactions between sampling proportion (percent of population sampled) and different interaction schemes among strains. I will address this with two new rounds of modeling, shown here:
@@ -112,19 +112,20 @@ sample_data3 <- synbias_lhs$generate_samples(10000, random_seed = 198) %>%
 
 ```{r round 2 and 3 simulations}
 if (simulation) {
-  plan(multisession, workers = 15)
-  imperfect_samples <-
-    sample_data2 %>% rowwise() %>% group_split() %>%
-    map(df_to_inputs) %>%
-    future_map(\(x) {
-      sourceCpp("ferrari.cpp")
-      mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
-      disease_sample(mat, prop = 0.1, imperfect_assays = FALSE)
-    }, .progress = T, seed = NULL)
-  results2 <- sample_data2 %>%
-    mutate(richness_count = map_dbl(imperfect_samples, sum))
-  write_csv(results2, "simulation_round2.csv")
-  rm(imperfect_samples) # release from memory
+  tic()
+  plan(multisession, workers = 8)
+  # imperfect_samples <-
+  #   sample_data2 %>% rowwise() %>% group_split() %>%
+  #   map(df_to_inputs) %>%
+  #   future_map(\(x) {
+  #     sourceCpp("ferrari.cpp")
+  #     mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
+  #     disease_sample(mat, prop = 0.1, imperfect_assays = FALSE)
+  #   }, .progress = T)
+  # results2 <- sample_data2 %>%
+  #   mutate(richness_count = map_dbl(imperfect_samples, sum))
+  # write_csv(results2, "simulation_round2.csv")
+  # rm(imperfect_samples) # release from memory
   inputs <- sample_data3 |> rowwise() |> 
     group_split() |> map(df_to_inputs)
   imperfect_samples <- future_map(sample_data3$id, \(i) {
@@ -137,6 +138,7 @@ if (simulation) {
   results3 <- sample_data3 |> 
               mutate(richness_count = map_dbl(imperfect_samples, sum))
   write_csv(results3, "simulation_round3.csv")
+  toc()
 } else {
   results2 <- read_csv("simulation_round2.csv")
   results3 <- read_csv("simulation_round3.csv")

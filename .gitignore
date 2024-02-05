@@ -5,3 +5,4 @@
 *.pdf
 /.quarto/
 .DS_Store
+*.docx

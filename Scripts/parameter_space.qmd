@@ -1,0 +1,213 @@
+---
+title: "Exploring the Parameter Space"
+author: "July Pilowsky"
+format: pdf
+---
+
+```{r setup, echo = F, include = F}
+library(tidyverse)
+library(scales)
+library(paletteer)
+library(cowplot)
+library(Rcpp)
+library(RcppArmadillo)
+library(furrr)
+library(tictoc)
+theme_set(theme_cowplot())
+source("lhs.R")
+source("simulation_functions.R")
+set.seed(185)
+simulation <- FALSE
+options(future.globals.maxSize= 9967869120)
+```
+
+I am exploring the parameter space in five ways. I am exploring the effects of interaction strength, ratio of competitive to facilitative interactions, number of strains, proportion of population sampled, baseline transmission rate, and presence/absence of priority effects.
+
+Aspects of simulations I am *not* changing are the population size, number of time steps, or accuracy of sampling (always perfect).
+
+# Simulation
+
+```{r simulate}
+if (simulation) {
+  plan(multisession, workers = 15)
+  imperfect_samples <-
+    sample_data %>% rowwise() %>% group_split() %>%
+    map(df_to_inputs) %>%
+    future_map(\(x) {
+      sourceCpp("ferrari.cpp")
+      mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
+      disease_sample(mat, prop = 0.1, imperfect_assays = FALSE)
+    }, .progress = T, seed = NULL)
+  results <- sample_data %>%
+    mutate(richness_count = map_dbl(imperfect_samples, sum))
+  write_csv(results, "Data/simulation_round1.csv")
+} else {
+  results <- read_csv("Data/simulation_round1.csv", show_col_types = F)
+}
+head(results)
+```
+
+Round 1 went well, but there are some new factors we want to consider in another round of modeling. One is to explore higher numbers of strains (the last round was capped at 100.) Another is to explore interactions between sampling proportion (percent of population sampled) and different interaction schemes among strains. I will address this with two new rounds of modeling, shown here:
+
+```{r round 2 and 3 data}
+library(poems)
+synbias_lhs <- LatinHypercubeSampler$new()
+synbias_lhs$set_uniform_parameter("interaction_strength", 0, 0.75)
+synbias_lhs$set_class_parameter("priority_effects", c(TRUE, FALSE))
+synbias_lhs$set_uniform_parameter("cf_ratio")
+synbias_lhs$set_uniform_parameter("strains", 100, 200, decimals = 0)
+sample_data2 <- synbias_lhs$generate_samples(10000, random_seed = 198) %>%
+  rowid_to_column("id")
+synbias_lhs$set_uniform_parameter("strains", 10, 200, decimals = 0)
+synbias_lhs$set_uniform_parameter("sample_prop", 0.01, 1)
+sample_data3 <- synbias_lhs$generate_samples(10000, random_seed = 198) %>%
+  rowid_to_column("id")
+```
+
+```{r round 2 and 3 simulations}
+if (simulation) {
+  tic()
+  plan(multisession, workers = 8)
+  imperfect_samples <-
+    sample_data2 %>% rowwise() %>% group_split() %>%
+    map(df_to_inputs) %>%
+    future_map(\(x) {
+      sourceCpp("ferrari.cpp")
+      mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
+      disease_sample(mat, prop = 0.1, imperfect_assays = FALSE)
+    }, .progress = T)
+  results2 <- sample_data2 %>%
+    mutate(richness_count = map_dbl(imperfect_samples, sum))
+  write_csv(results2, "Data/simulation_round2.csv")
+  rm(imperfect_samples) # release from memory
+  inputs <- sample_data3 |> rowwise() |> 
+    group_split() |> map(df_to_inputs)
+  imperfect_samples <- future_map(sample_data3$id, \(i) {
+    sourceCpp("ferrari.cpp")
+    mat <- ferrari(inputs[[i]]$initial_pop, inputs[[i]]$interactions, 2e-04,
+                   100)
+    disease_sample(mat, prop = sample_data3$sample_prop[i],
+                   imperfect_assays = FALSE)
+  })
+  results3 <- sample_data3 |> 
+              mutate(richness_count = map_dbl(imperfect_samples, sum))
+  write_csv(results3, "Data/simulation_round3.csv")
+  toc()
+} else {
+  results2 <- read_csv("Data/simulation_round2.csv",
+                       show_col_types = F)
+  results3 <- read_csv("Data/simulation_round3.csv",
+                       show_col_types = F)
+}
+```
+
+Here I try a fourth round of simulation, this one focused on whether it makes a difference if the baseline transmission rate is 10x lower.
+
+```{r round 4 simulations}
+if (simulation) {
+  tic()
+  plan(multisession, workers = 8)
+  inputs <- sample_data3 |> rowwise() |> 
+    group_split() |> map(df_to_inputs)
+  imperfect_samples <- future_map(sample_data3$id, \(i) {
+    sourceCpp("ferrari.cpp")
+    mat <- ferrari(inputs[[i]]$initial_pop, inputs[[i]]$interactions, 2e-05,
+                   100)
+    disease_sample(mat, prop = sample_data3$sample_prop[i],
+                   imperfect_assays = FALSE)
+  })
+  results4 <- sample_data3 |> 
+              mutate(richness_count = map_dbl(imperfect_samples, sum))
+  write_csv(results4, "Data/simulation_round4.csv")
+  toc()
+} else {
+  results4 <- read_csv("Data/simulation_round4.csv",
+                       show_col_types = F)
+}
+```
+
+# Visualization
+
+## Does greater parasite richness "smooth out" effects of interaction on bias?
+
+```{r strain number}
+all_results <- bind_rows(results, results2, results3) |> 
+  mutate(sample_prop = replace_na(sample_prop, 0.1),
+         percent_error = ((strains-richness_count)/strains)*100)
+binned_data <- all_results %>%
+  mutate(strains_mid = (floor(strains / 5) * 5) + 2.5,
+         cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
+  group_by(strains_mid, cf_ratio_mid) %>%
+  summarize(avg_percent_error = mean(percent_error, na.rm = TRUE))
+# Define breaks and labels for the y-axis
+y_breaks <- c(min(binned_data$cf_ratio_mid), max(binned_data$cf_ratio_mid))
+y_labels <- c("100%\nfacilitative", "100%\ncompetitive")
+
+# Creating the plot
+ggplot(binned_data, aes(x = strains_mid, y = cf_ratio_mid, fill = avg_percent_error)) +
+  geom_tile() +
+  scale_fill_viridis_c(limits = c(0, 100)) +
+  labs(title = "Heatmap: Strains vs C:F Ratio", 
+       x = "Strains", fill = "% Error") +
+  theme_minimal_grid() +
+  scale_x_continuous(labels = scales::label_number()) + 
+  scale_y_continuous(breaks = y_breaks, labels = y_labels) +
+  theme(axis.title.y = element_blank())
+```
+
+## Does the strength of interactions matter?
+
+```{r interaction strength}
+binned_data <- all_results %>%
+  mutate(interaction_strength_mid = (floor(interaction_strength / 0.03) * 0.03) + 0.015,
+         cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
+  group_by(interaction_strength_mid, cf_ratio_mid) %>%
+  summarize(avg_percent_error = mean(percent_error, na.rm = TRUE))
+y_breaks <- c(min(binned_data$cf_ratio_mid), max(binned_data$cf_ratio_mid))
+y_labels <- c("100%\nfacilitative", "100%\ncompetitive")
+
+# Creating the plot
+ggplot(binned_data, aes(x = interaction_strength_mid, y = cf_ratio_mid, fill = avg_percent_error)) +
+  geom_tile() +
+  scale_fill_viridis_c(limits = c(0, 100)) +
+  labs(title = "Heatmap: Interaction Strength vs CF Ratio", 
+       x = "Interaction Strength", fill = "% Error") +
+  theme_minimal_grid() +
+  scale_x_continuous(labels = scales::label_number()) + 
+  scale_y_continuous(breaks = y_breaks, labels = y_labels) +
+  theme(axis.title.y = element_blank())  
+```
+
+## What about the proportion of the population sampled?
+
+You'd think this would be the most important factor. However...
+
+```{r sample prop}
+ggplot(all_results, aes(x = sample_prop*100, y = percent_error)) + 
+  geom_point() +
+  theme_minimal_grid() + xlab("% of Population Sampled") +
+  ylab("% Error")
+```
+
+## Interactions between strains are more important than % sampled
+
+```{r sample prop cf ratio}
+binned_data <- all_results %>%
+  mutate(sample_prop_mid = (floor(sample_prop / 0.04) * 0.04) + 0.02,
+         cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
+  group_by(sample_prop_mid, cf_ratio_mid) %>%
+  summarize(avg_percent_error = mean(percent_error, na.rm = TRUE))
+y_breaks <- c(min(binned_data$cf_ratio_mid), max(binned_data$cf_ratio_mid))
+y_labels <- c("100%\nfacilitative", "100%\ncompetitive")
+
+# Creating the plot
+ggplot(binned_data, aes(x = sample_prop_mid*100, y = cf_ratio_mid, fill = avg_percent_error)) +
+  geom_tile() +
+  scale_fill_viridis_c(limits = c(0, 100)) +
+  labs(title = "Heatmap: Sample Proportion vs CF Ratio", 
+       x = "% of Population Sampled", fill = "% Error") +
+  theme_minimal_grid() +
+  scale_x_continuous(labels = scales::label_number()) + 
+  scale_y_continuous(breaks = y_breaks, labels = y_labels) +
+  theme(axis.title.y = element_blank()) 
+```

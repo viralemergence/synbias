@@ -13,15 +13,16 @@ library(Rcpp)
 library(RcppArmadillo)
 library(furrr)
 library(tictoc)
+
 theme_set(theme_cowplot())
 source("lhs.R")
 source("simulation_functions.R")
 set.seed(185)
-simulation <- FALSE
+simulation <- TRUE
 options(future.globals.maxSize= 9967869120)
 ```
 
-I am exploring the parameter space in five ways. I am exploring the effects of interaction strength, ratio of competitive to facilitative interactions, number of strains, proportion of population sampled, baseline transmission rate, and presence/absence of priority effects.
+I am exploring the parameter space in six ways. I am exploring the effects of interaction strength, ratio of competitive to facilitative interactions, number of strains, proportion of population sampled, baseline transmission rate, and presence/absence of priority effects.
 
 Aspects of simulations I am *not* changing are the population size, number of time steps, or accuracy of sampling (always perfect).
 
@@ -40,9 +41,9 @@ if (simulation) {
     }, .progress = T, seed = NULL)
   results <- sample_data %>%
     mutate(richness_count = map_dbl(imperfect_samples, sum))
-  write_csv(results, "Data/simulation_round1.csv")
+  write_csv(results, here("Data/simulation_round1.csv"))
 } else {
-  results <- read_csv("Data/simulation_round1.csv", show_col_types = F)
+  results <- read_csv(here("Data/simulation_round1.csv"), show_col_types = F)
 }
 head(results)
 ```
@@ -78,7 +79,7 @@ if (simulation) {
     }, .progress = T)
   results2 <- sample_data2 %>%
     mutate(richness_count = map_dbl(imperfect_samples, sum))
-  write_csv(results2, "Data/simulation_round2.csv")
+  write_csv(results2, here("Data/simulation_round2.csv"))
   rm(imperfect_samples) # release from memory
   inputs <- sample_data3 |> rowwise() |> 
     group_split() |> map(df_to_inputs)
@@ -91,12 +92,12 @@ if (simulation) {
   })
   results3 <- sample_data3 |> 
               mutate(richness_count = map_dbl(imperfect_samples, sum))
-  write_csv(results3, "Data/simulation_round3.csv")
+  write_csv(results3, here("Data/simulation_round3.csv"))
   toc()
 } else {
-  results2 <- read_csv("Data/simulation_round2.csv",
+  results2 <- read_csv(here("Data/simulation_round2.csv"),
                        show_col_types = F)
-  results3 <- read_csv("Data/simulation_round3.csv",
+  results3 <- read_csv(here("Data/simulation_round3.csv"),
                        show_col_types = F)
 }
 ```
@@ -118,10 +119,10 @@ if (simulation) {
   })
   results4 <- sample_data3 |> 
               mutate(richness_count = map_dbl(imperfect_samples, sum))
-  write_csv(results4, "Data/simulation_round4.csv")
+  write_csv(results4, here("Data/simulation_round4.csv"))
   toc()
 } else {
-  results4 <- read_csv("Data/simulation_round4.csv",
+  results4 <- read_csv(here("Data/simulation_round4.csv"),
                        show_col_types = F)
 }
 ```
@@ -211,3 +212,5 @@ ggplot(binned_data, aes(x = sample_prop_mid*100, y = cf_ratio_mid, fill = avg_pe
   scale_y_continuous(breaks = y_breaks, labels = y_labels) +
   theme(axis.title.y = element_blank()) 
 ```
+
+## Priority Effects

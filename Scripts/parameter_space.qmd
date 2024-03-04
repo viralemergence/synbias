@@ -13,12 +13,12 @@ library(Rcpp)
 library(RcppArmadillo)
 library(furrr)
 library(tictoc)
-
+library(here)
 theme_set(theme_cowplot())
 source("lhs.R")
 source("simulation_functions.R")
 set.seed(185)
-simulation <- TRUE
+simulation <- FALSE
 options(future.globals.maxSize= 9967869120)
 ```
 
@@ -132,10 +132,11 @@ if (simulation) {
 ## Does greater parasite richness "smooth out" effects of interaction on bias?
 
 ```{r strain number}
-all_results <- bind_rows(results, results2, results3) |> 
+all_results <- bind_rows(results, results2, results3, results4) |> 
   mutate(sample_prop = replace_na(sample_prop, 0.1),
-         percent_error = ((strains-richness_count)/strains)*100)
-binned_data <- all_results %>%
+         percent_error = ((strains-richness_count)/strains)*100,
+         transmission_rate = c(rep(2e-4, 30000), rep(2e-5, 10000)))
+binned_data <- all_results %>% filter(transmission_rate > 2e-5) |> 
   mutate(strains_mid = (floor(strains / 5) * 5) + 2.5,
          cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
   group_by(strains_mid, cf_ratio_mid) %>%
@@ -159,7 +160,7 @@ ggplot(binned_data, aes(x = strains_mid, y = cf_ratio_mid, fill = avg_percent_er
 ## Does the strength of interactions matter?
 
 ```{r interaction strength}
-binned_data <- all_results %>%
+binned_data <- all_results %>% filter(transmission_rate > 2e-5) |> 
   mutate(interaction_strength_mid = (floor(interaction_strength / 0.03) * 0.03) + 0.015,
          cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
   group_by(interaction_strength_mid, cf_ratio_mid) %>%
@@ -184,7 +185,8 @@ ggplot(binned_data, aes(x = interaction_strength_mid, y = cf_ratio_mid, fill = a
 You'd think this would be the most important factor. However...
 
 ```{r sample prop}
-ggplot(all_results, aes(x = sample_prop*100, y = percent_error)) + 
+all_results |> 
+  ggplot(aes(x = sample_prop*100, y = percent_error)) + 
   geom_point() +
   theme_minimal_grid() + xlab("% of Population Sampled") +
   ylab("% Error")
@@ -193,7 +195,7 @@ ggplot(all_results, aes(x = sample_prop*100, y = percent_error)) +
 ## Interactions between strains are more important than % sampled
 
 ```{r sample prop cf ratio}
-binned_data <- all_results %>%
+binned_data <- all_results %>% filter(transmission_rate > 2e-5) |> 
   mutate(sample_prop_mid = (floor(sample_prop / 0.04) * 0.04) + 0.02,
          cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
   group_by(sample_prop_mid, cf_ratio_mid) %>%

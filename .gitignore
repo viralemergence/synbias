@@ -4,5 +4,6 @@
 .Ruserdata
 *.pdf
 /.quarto/
+*.qs
 .DS_Store
 *.docx

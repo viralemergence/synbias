@@ -64,3 +64,75 @@ sample_data3$richness_count <-  1:10000 |>
                   diversity_sample,
                   timepoint = 35,
                   .progress = T)
+#### Figures ####
+all_results <- "Data/simulation_round5/simulation_round5.csv" |> read_csv() |>
+  mutate(percent_error = ((strains-richness_count)/strains)*100)
+binned_data <- all_results %>%
+  mutate(strains_mid = (floor(strains / 5) * 5) + 2.5,
+         cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
+  group_by(strains_mid, cf_ratio_mid) %>%
+  summarize(avg_percent_error = mean(percent_error, na.rm = TRUE))
+# Define breaks and labels for the y-axis
+y_breaks <- c(min(binned_data$cf_ratio_mid), max(binned_data$cf_ratio_mid))
+y_labels <- c("100%\nfacilitative", "100%\ncompetitive")
+
+# Creating the plot
+ggplot(binned_data, aes(x = strains_mid, y = cf_ratio_mid, fill = avg_percent_error)) +
+  geom_tile() +
+  scale_fill_viridis_c(limits = c(-0.5, 10)) +
+  labs(title = "Heatmap: Strains vs C:F Ratio",
+       x = "Strains", fill = "% Error") +
+  theme_minimal_grid() +
+  scale_x_continuous(labels = scales::label_number()) +
+  scale_y_continuous(breaks = y_breaks, labels = y_labels) +
+  theme(axis.title.y = element_blank())
+
+binned_data <- all_results |>
+  mutate(interaction_strength_mid = (floor(interaction_strength / 0.03) * 0.03) + 0.015,
+         cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
+  group_by(interaction_strength_mid, cf_ratio_mid) %>%
+  summarize(avg_percent_error = mean(percent_error, na.rm = TRUE))
+y_breaks <- c(min(binned_data$cf_ratio_mid), max(binned_data$cf_ratio_mid))
+y_labels <- c("100%\nfacilitative", "100%\ncompetitive")
+
+# Creating the plot
+ggplot(binned_data, aes(x = interaction_strength_mid, y = cf_ratio_mid, fill = avg_percent_error)) +
+  geom_tile() +
+  scale_fill_viridis_c(limits = c(-0.5, 10)) +
+  labs(title = "Heatmap: Interaction Strength vs CF Ratio",
+       x = "Interaction Strength", fill = "% Error") +
+  theme_minimal_grid() +
+  scale_x_continuous(labels = scales::label_number()) +
+  scale_y_continuous(breaks = y_breaks, labels = y_labels) +
+  theme(axis.title.y = element_blank())
+
+all_results |>
+  ggplot(aes(x = sample_prop*100, y = percent_error)) +
+  geom_point() +
+  theme_minimal_grid() + xlab("% of Population Sampled") +
+  ylab("% Error")
+
+binned_data <- all_results |>
+  mutate(sample_prop_mid = (floor(sample_prop / 0.04) * 0.04) + 0.02,
+         cf_ratio_mid = (floor(cf_ratio / 0.05) * 0.05) + 0.025) %>%
+  group_by(sample_prop_mid, cf_ratio_mid) %>%
+  summarize(avg_percent_error = mean(percent_error, na.rm = TRUE))
+y_breaks <- c(min(binned_data$cf_ratio_mid), max(binned_data$cf_ratio_mid))
+y_labels <- c("100%\nfacilitative", "100%\ncompetitive")
+
+# Creating the plot
+ggplot(binned_data, aes(x = sample_prop_mid*100, y = cf_ratio_mid, fill = avg_percent_error)) +
+  geom_tile() +
+  scale_fill_viridis_c(limits = c(-0.5, 50)) +
+  labs(title = "Heatmap: Sample Proportion vs CF Ratio",
+       x = "% of Population Sampled", fill = "% Error") +
+  theme_minimal_grid() +
+  scale_x_continuous(labels = scales::label_number()) +
+  scale_y_continuous(breaks = y_breaks, labels = y_labels) +
+  theme(axis.title.y = element_blank())
+
+#### Sensitivity Analysis ####
+library(tidymodels)
+tidymodels_prefer()
+time35_split <- initial_split(all_results)
+time35_spec <- rand_forest() |> set_mode("regression")

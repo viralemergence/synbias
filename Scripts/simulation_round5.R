@@ -4,6 +4,7 @@ library(tidyverse)
 library(furrr)
 library(Rcpp)
 library(qs)
+library(vroom)
 source("Scripts/simulation_functions.R")
 sourceCpp("Scripts/ferrari.cpp")
 options(future.globals.maxSize= 9967869120)
@@ -17,9 +18,21 @@ synbias_lhs$set_uniform_parameter("strains", 10, 200, decimals = 0)
 synbias_lhs$set_uniform_parameter("sample_prop", 0.01, 1)
 sample_data3 <- synbias_lhs$generate_samples(10000, random_seed = 216) %>%
   rowid_to_column("id")
-plan(sequential)
+plan(multisession, workers = 2)
+random.seed(306)
 inputs <- sample_data3 %>% rowwise() %>% group_split() %>%
   map(df_to_inputs)
+strains <- inputs |> 
+  map("interactions") |> 
+  map(function(x) {
+    sapply(1:nrow(x), function(i) {
+      sum(x[i, ] + x[, i]) / (nrow(x) * 2)
+    })
+  }) |>
+  map(as.data.frame, nm = "CF_Score") |>
+  map(\(x) cbind(x, Strain = 1:nrow(x))) |>
+  list_rbind(names_to = "Simulation")
+vroom_write(strains, "Data/simulation_round5/per_strain.csv")
 future_walk(1:length(inputs), \(x) {
   filename <- paste0(getwd(),
                      "/Data/simulation_round5/sim",
@@ -64,6 +77,7 @@ sample_data3$richness_count <-  1:10000 |>
                   diversity_sample,
                   timepoint = 35,
                   .progress = T)
+write_csv(sample_data3, "Data/simulation_round5/simulation_round5.csv")
 #### Figures ####
 all_results <- "Data/simulation_round5/simulation_round5.csv" |> read_csv() |>
   mutate(percent_error = ((strains-richness_count)/strains)*100)

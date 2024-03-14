@@ -1,0 +1,91 @@
+---
+title: "Coinfection bias simulations: round 6"
+format: html
+---
+
+```{r setup}
+library(poems)
+library(tidyverse)
+library(furrr)
+library(Rcpp)
+library(qs)
+library(vroom)
+library(here)
+source(here("Scripts/simulation_functions.R"))
+sourceCpp(here("Scripts/ferrari.cpp"))
+options(future.globals.maxSize= 9967869120)
+data_dir <- here("/Data/simulation_round6/")
+opts_chunk$set(message = F)
+```
+
+# Rationale
+
+In this round of simulations, I am trying out a new approach. Previously, we generated pairwise interactions between strains using a C:F ratio to divide matrices between competition and facilitation, then interaction strength to determine the bounds of the uniform distribution of competition and facilitation from which the values would be drawn. This time, we will generate pairwise interactions from a normal distribution, with the CF ratio shaping the mean and interaction strength shaping the SD. The actual outbreak simulations, and all other aspects, remain the same.
+
+# Generate inputs
+
+```{r generate inputs}
+synbias_lhs <- LatinHypercubeSampler$new()
+synbias_lhs$set_uniform_parameter("interaction_strength", 0, 0.75)
+synbias_lhs$set_class_parameter("priority_effects", c(TRUE, FALSE))
+synbias_lhs$set_uniform_parameter("cf_ratio")
+synbias_lhs$set_uniform_parameter("strains", 10, 200, decimals = 0)
+synbias_lhs$set_uniform_parameter("sample_prop", 0.01, 1)
+sample_data6 <- synbias_lhs$generate_samples(10000, random_seed = 324) %>%
+  rowid_to_column("id")
+set.seed(1800)
+inputs <- sample_data6 %>% rowwise() %>% group_split() %>%
+  map(function(df) {
+    int_matrix <- matrix(1, nrow = df$strains, ncol = df$strains)
+    int_matrix[] <- rnorm(n = df$strains*df$strains, mean = df$cf_ratio, sd = df$interaction_strength)
+    diag(int_matrix) <- 1
+    initial_pop <- c(rep(c(1, rep(0, df$strains)), df$strains),
+                    rep(0, df$strains*1000 - df$strains*(df$strains+1))) |>
+      matrix(nrow = 1000, byrow = T)
+    return(list(initial_pop = initial_pop, interactions = int_matrix))
+  })
+strainDF <- inputs %>% 
+  map("interactions") |>
+  map(function(a){
+    
+    Comp <- a
+    Comp[Comp > 1] <- 0
+    Comp <- abs(Comp-1)
+    Comp[Comp == 1] <- 0
+    
+    Fac <- a
+    Fac[Fac < 1] <- 0
+    Fac <- Fac-1
+    Fac[Fac == -1] <- 0
+    
+    diag(Comp) <- diag(Fac) <- 0
+    
+    data.frame(CompStrength = rowSums(Comp),
+               FacStrength = rowSums(Fac),
+               CompMeans = rowMeans(Comp),
+               FacMeans = rowMeans(Fac))
+    
+  }) %>% bind_rows(.id = "id") %>% 
+  left_join(sample_data6) |>
+  mutate(TotalStrength = CompStrength + FacStrength, 
+                   TotalMean = CompMeans + FacMeans)
+summary(sample_data6)
+summary(strainDF)
+```
+
+# Simulate
+
+```{r simulate}
+future_walk(1:length(inputs), \(x) {
+  filename <- paste0(getwd(),
+                     "/Data/simulation_round6/sim",
+                     sample_data6$id[x],
+                     ".qs")
+  if (!file.exists(filename)) {
+    sourceCpp("Scripts/ferrari.cpp")
+    x <- inputs[[x]]
+    mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
+    qsave(mat, filename)
+  }
+}, .progress = T)
+```

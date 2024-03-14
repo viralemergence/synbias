@@ -19,19 +19,23 @@ synbias_lhs$set_uniform_parameter("sample_prop", 0.01, 1)
 sample_data3 <- synbias_lhs$generate_samples(10000, random_seed = 216) %>%
   rowid_to_column("id")
 plan(multisession, workers = 2)
-random.seed(306)
+set.seed(306)
 inputs <- sample_data3 %>% rowwise() %>% group_split() %>%
   map(df_to_inputs)
 strains <- inputs |> 
   map("interactions") |> 
   map(function(x) {
-    sapply(1:nrow(x), function(i) {
-      sum(x[i, ] + x[, i]) / (nrow(x) * 2)
-    })
-  }) |>
-  map(as.data.frame, nm = "CF_Score") |>
+    x <- x - 1
+    t(sapply(1:nrow(x), function(i) {
+      c(sum(abs(c(x[i, ][x[i, ] < 0], x[, i][x[, i] < 0]))), 
+        sum(c(x[i, ][x[i, ] > 0], x[, i][x[, i] > 0])))
+    }))
+  }) |> 
+  map(~ matrix(.x, ncol = 2, byrow = TRUE)) |>
+  map(as.data.frame) |>
   map(\(x) cbind(x, Strain = 1:nrow(x))) |>
-  list_rbind(names_to = "Simulation")
+  list_rbind(names_to = "Simulation") |>
+  set_names(c("Simulation", "Competition", "Facilitation", "Strain"))
 vroom_write(strains, "Data/simulation_round5/per_strain.csv")
 future_walk(1:length(inputs), \(x) {
   filename <- paste0(getwd(),
@@ -47,8 +51,8 @@ future_walk(1:length(inputs), \(x) {
 }, .progress = T)
 #### 50 percent prevalence points ####
 # Try it with one example first
-sim1 <- paste0(getwd(), data_dir, "sim1.qs") |> qread()
-sim1 |> apply(c(2, 3), sum) |> array_branch(1) |> map(\(x) x >= 500) |>
+sim1000 <- paste0(getwd(), data_dir, "sim1000.qs") |> qread()
+sim1000 |> apply(c(2, 3), sum) |> array_branch(1) |> map(\(x) x >= 500) |>
   map_int(match, x = TRUE)
 # Scale it up
 prevalence50 <- function(path) {
@@ -78,6 +82,13 @@ sample_data3$richness_count <-  1:10000 |>
                   timepoint = 35,
                   .progress = T)
 write_csv(sample_data3, "Data/simulation_round5/simulation_round5.csv")
+strains |> 
+  left_join(sample_data3, by = c("Simulation" = "id")) |>
+  ggplot(aes(x = Competition/strains, y = Facilitation/strains)) +
+  geom_bin_2d() +
+  scale_fill_viridis_c() +
+  coord_fixed() +
+  cowplot::theme_cowplot()
 #### Figures ####
 all_results <- "Data/simulation_round5/simulation_round5.csv" |> read_csv() |>
   mutate(percent_error = ((strains-richness_count)/strains)*100)

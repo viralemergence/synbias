@@ -15,7 +15,7 @@ source(here("Scripts/simulation_functions.R"))
 sourceCpp(here("Scripts/ferrari.cpp"))
 options(future.globals.maxSize= 9967869120)
 data_dir <- here("/Data/simulation_round6/")
-opts_chunk$set(message = F)
+simulate <- TRUE
 ```
 
 # Rationale
@@ -25,16 +25,20 @@ In this round of simulations, I am trying out a new approach. Previously, we gen
 # Generate inputs
 
 ```{r generate inputs}
-synbias_lhs <- LatinHypercubeSampler$new()
-synbias_lhs$set_uniform_parameter("interaction_strength", 0, 0.75)
-synbias_lhs$set_class_parameter("priority_effects", c(TRUE, FALSE))
-synbias_lhs$set_uniform_parameter("cf_ratio")
-synbias_lhs$set_uniform_parameter("strains", 10, 200, decimals = 0)
-synbias_lhs$set_uniform_parameter("sample_prop", 0.01, 1)
-sample_data6 <- synbias_lhs$generate_samples(10000, random_seed = 324) %>%
-  rowid_to_column("id")
 set.seed(1800)
-inputs <- sample_data6 %>% rowwise() %>% group_split() %>%
+DFList <- 
+  1:10000 %>% 
+  map(function(a){
+    
+    data.frame(id = a, 
+               interaction_strength = runif(1, 0, 0.3),
+               cf_ratio = runif(1, 0.7, 1.3),
+               priority_effects = F,
+               strains = round(runif(1, 5, 100)), 
+               sample_prop = runif(1, 0.1, 1))
+    
+  })
+inputs <- DFList %>%
   map(function(df) {
     int_matrix <- matrix(1, nrow = df$strains, ncol = df$strains)
     int_matrix[] <- rnorm(n = df$strains*df$strains, mean = df$cf_ratio, sd = df$interaction_strength)
@@ -66,26 +70,30 @@ strainDF <- inputs %>%
                FacMeans = rowMeans(Fac))
     
   }) %>% bind_rows(.id = "id") %>% 
-  left_join(sample_data6) |>
+  mutate(id = as.numeric(id)) |>
+  left_join(DFList %>% bind_rows(.id = "ID")) |>
   mutate(TotalStrength = CompStrength + FacStrength, 
                    TotalMean = CompMeans + FacMeans)
-summary(sample_data6)
+
 summary(strainDF)
+write_csv(strainDF, here("Data/simulation_round6/simulation_round6_inputs.csv"))
 ```
 
 # Simulate
 
 ```{r simulate}
-future_walk(1:length(inputs), \(x) {
-  filename <- paste0(getwd(),
-                     "/Data/simulation_round6/sim",
-                     sample_data6$id[x],
-                     ".qs")
-  if (!file.exists(filename)) {
-    sourceCpp("Scripts/ferrari.cpp")
-    x <- inputs[[x]]
-    mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
-    qsave(mat, filename)
-  }
-}, .progress = T)
+if (simulate) {
+  future_walk(1:length(inputs), \(x) {
+    filename <- paste0(getwd(),
+                       "/Data/simulation_round6/sim",
+                       sample_data6$id[x],
+                       ".qs")
+    if (!file.exists(filename)) {
+      sourceCpp("Scripts/ferrari.cpp")
+      x <- inputs[[x]]
+      mat <- ferrari(x$initial_pop, x$interactions, 2e-04, 100)
+      qsave(mat, filename)
+    }
+  }, .progress = T)
+}
 ```

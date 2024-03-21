@@ -11,10 +11,11 @@ library(Rcpp)
 library(qs)
 library(vroom)
 library(here)
+library(data.table)
 source(here("Scripts/simulation_functions.R"))
 sourceCpp(here("Scripts/ferrari.cpp"))
 options(future.globals.maxSize= 9967869120)
-data_dir <- here("/Data/simulation_round6/")
+data_dir <- here("Data/simulation_round6")
 simulate <- TRUE
 ```
 
@@ -67,16 +68,18 @@ strainDF <- inputs %>%
     data.frame(CompStrength = rowSums(Comp),
                FacStrength = rowSums(Fac),
                CompMeans = rowMeans(Comp),
-               FacMeans = rowMeans(Fac))
+               FacMeans = rowMeans(Fac),
+               Strain = 1:nrow(a))
     
   }) %>% bind_rows(.id = "id") %>% 
   mutate(id = as.numeric(id)) |>
-  left_join(DFList %>% bind_rows(.id = "ID")) |>
+  left_join(DFList |> bind_rows()) |>
   mutate(TotalStrength = CompStrength + FacStrength, 
                    TotalMean = CompMeans + FacMeans)
 
 summary(strainDF)
 write_csv(strainDF, here("Data/simulation_round6/simulation_round6_inputs.csv"))
+setDT(strainDF)
 ```
 
 # Simulate
@@ -96,4 +99,27 @@ if (simulate) {
     }
   }, .progress = T)
 }
+```
+
+# Sample
+
+```{r sample}
+disease_sample <- function(sim_number, prop) {
+  matrix <- file.path(data_dir, paste0("sim", sim_number, ".qs")) |> qread()
+  individuals <- round(prop*nrow(matrix))
+  map(1:100, ~matrix[sample(1:nrow(matrix), individuals), , .]) |>
+    abind::abind(along = 3) |> 
+    colSums() |> 
+    apply(c(1,2), as.logical) |> 
+    array_branch(1) |> 
+    map(\(dt) data.table(detect = dt, time = 1:100)) |> 
+    map2(strainDF[id == sim_number] %>% split(seq_len(nrow(.))), cbind) |> 
+    rbindlist()
+}
+plan(sequential)
+detect_df <- future_map(1:10000, \(i) disease_sample(i, DFList[[i]]$sample_prop)) |>
+  rbindlist()
+  
+glm(detect ~ time:CompMeans + time:FacMeans + time, family = binomial, 
+    data = detect_df)
 ```

@@ -9,9 +9,11 @@ library(tidyverse)
 library(furrr)
 library(Rcpp)
 library(qs)
-library(vroom)
 library(here)
 library(data.table)
+library(mgcv)
+library(gratia)
+library(parallel)
 source(here("Scripts/simulation_functions.R"))
 sourceCpp(here("Scripts/ferrari.cpp"))
 options(future.globals.maxSize= 9967869120)
@@ -116,10 +118,20 @@ disease_sample <- function(sim_number, prop) {
     map2(strainDF[id == sim_number] %>% split(seq_len(nrow(.))), cbind) |> 
     rbindlist()
 }
-plan(sequential)
+plan(multisession)
 detect_df <- future_map(1:10000, \(i) disease_sample(i, DFList[[i]]$sample_prop)) |>
   rbindlist()
-  
-glm(detect ~ time:CompMeans + time:FacMeans + time, family = binomial, 
-    data = detect_df)
+```
+
+# Analyze
+
+## GAM
+
+To check for nonlinearities.
+
+```{r}
+tensor_gam <- bam(detect ~ te(CompMeans, FacMeans) + s(strains) + s(sample_prop),
+                  family = binomial(), data = detect_df,
+                  cluster = makeCluster(2))
+draw(tensor_gam)
 ```

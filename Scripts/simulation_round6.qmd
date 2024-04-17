@@ -14,11 +14,13 @@ library(data.table)
 library(mgcv)
 library(gratia)
 library(parallel)
+library(parglm)
 source(here("Scripts/simulation_functions.R"))
 sourceCpp(here("Scripts/ferrari.cpp"))
 options(future.globals.maxSize= 9967869120)
 data_dir <- here("Data/simulation_round6")
-simulate <- TRUE
+simulate <- FALSE
+run_gam <- FALSE
 ```
 
 # Rationale
@@ -118,7 +120,7 @@ disease_sample <- function(sim_number, prop) {
     map2(strainDF[id == sim_number] %>% split(seq_len(nrow(.))), cbind) |> 
     rbindlist()
 }
-plan(multisession)
+plan(sequential)
 detect_df <- future_map(1:10000, \(i) disease_sample(i, DFList[[i]]$sample_prop)) |>
   rbindlist()
 ```
@@ -129,9 +131,66 @@ detect_df <- future_map(1:10000, \(i) disease_sample(i, DFList[[i]]$sample_prop)
 
 To check for nonlinearities.
 
-```{r}
-tensor_gam <- bam(detect ~ te(CompMeans, FacMeans) + s(strains) + s(sample_prop),
+```{r gam}
+if (run_gam) {
+  tensor_gam <- bam(detect ~ te(CompMeans, FacMeans) + s(strains) + s(sample_prop),
                   family = binomial(), data = detect_df,
                   cluster = makeCluster(2))
-draw(tensor_gam)
+  draw(tensor_gam)
+}
+```
+
+## GLM
+
+The behavior of the predictors does not look too far from linear, so I will go ahead and do some GLMs. Here is an analysis where I include population as a random effect and competition and facilitation as interactions with time.
+
+```{r glm}
+detect_glm <- parglm(detect ~ time + time:CompMeans + time:FacMeans + strains +
+                sample_prop,
+            data = detect_df,
+            family = binomial, 
+            control = parglm.control(nthreads = 3L))
+library(ggplot2)
+# Create a dataframe for the coefficients
+coefficients <- data.frame(
+  Term = c("time", "strains", "sample_prop", "time:CompMeans", "time:FacMeans"),
+  Estimate = c(0.1667994, -0.0006991, 4.7302201, -0.2080439, 0.1072236)
+)
+
+# Plotting
+ggplot(coefficients, aes(x = Term, y = Estimate, fill = Estimate > 0)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "GLM Coefficients", x = "Terms", y = "Coefficient Value") +
+  scale_fill_manual(values = c("red", "blue"), name = "Effect", labels = c("Negative", "Positive")) +
+  theme_minimal()
+
+# Generate a grid of values for 'time' and 'CompMeans'
+time_values <- seq(min(detect_df$time), max(detect_df$time), length.out = 100)
+comp_means_values <- seq(min(detect_df$CompMeans), max(detect_df$CompMeans), length.out = 100)
+
+# Create a grid for prediction
+prediction_grid <- expand.grid(time = time_values, CompMeans = comp_means_values)
+
+# Assume mean values for other predictors for simplicity
+mean_strains <- mean(detect_df$strains)
+mean_sample_prop <- mean(detect_df$sample_prop)
+mean_fac_means <- mean(detect_df$FacMeans)
+
+# Add constant predictors
+prediction_grid$strains <- mean_strains
+prediction_grid$sample_prop <- mean_sample_prop
+prediction_grid$FacMeans <- mean_fac_means
+
+# Predict over the grid
+prediction_grid$Predicted <- predict(detect_glm, newdata = prediction_grid, type = "response")
+
+# Plot
+ggplot(prediction_grid, aes(x = time, y = CompMeans, fill = Predicted)) +
+  geom_tile() + # or use geom_raster() for large datasets
+  scale_fill_gradient2(low = "purple", high = "green", mid = "white", midpoint = 0.8, 
+                       name = "Probability") +
+  labs(title = "Interaction Effect of 'time' and 'CompMeans'", 
+       x = "Time", y = "CompMeans") +
+  theme_minimal()
 ```

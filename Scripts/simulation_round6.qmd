@@ -14,10 +14,13 @@ library(data.table)
 library(mgcv)
 library(gratia)
 library(parallel)
-library(parglm)
+# library(parglm)
+library(cowplot)
+library(paletteer)
 source(here("Scripts/simulation_functions.R"))
 sourceCpp(here("Scripts/ferrari.cpp"))
 options(future.globals.maxSize= 9967869120)
+theme_set(theme_cowplot())
 data_dir <- here("Data/simulation_round6")
 simulate <- FALSE
 run_gam <- FALSE
@@ -84,6 +87,19 @@ strainDF <- inputs %>%
 summary(strainDF)
 write_csv(strainDF, here("Data/simulation_round6/simulation_round6_inputs.csv"))
 setDT(strainDF)
+
+strainDF %>% slice_sample(n = 10000) %>% 
+  ggplot(aes(CompStrength, FacStrength)) + 
+  geom_density2d() +
+  geom_point(aes(colour = cf_ratio, size = strains)) +
+  scale_size_continuous(name = "Strains") +
+  scale_color_paletteer_c(name = "C:F Ratio",
+                          palette = "grDevices::Cividis") +
+  lims(x = c(0, NA), y = c(0, NA)) +
+  coord_fixed() +
+  xlab("Facilitation Strength") + 
+  ylab("Competition Strength")
+ggsave(here("Figures/Fig 1 input distribution v1.png"))
 ```
 
 # Simulate
@@ -127,6 +143,27 @@ detect_df <- future_map(1:10000, \(i) disease_sample(i, DFList[[i]]$sample_prop)
 
 # Analyze
 
+## 50% prevalence timepoint
+
+It is important for us to understand the timepoint at which strains reach 50% prevalence, on average, so we get a sense of the range of timepoints that have realistic prevalences.
+
+```{r 50 percent prevalence}
+prevalence50 <- function(path) {
+  path |> qread() |>
+    apply(c(2, 3), sum) |>
+    array_branch(1) |>
+    map(\(x) x >= 500) |>
+    map_int(match, x = TRUE)
+}
+plan(multisession, workers = 4)
+timepoints <- 1:10000 |>
+  map(\(x) paste0(data_dir, "/sim", x, ".qs")) |>
+  future_map(prevalence50, .progress = T)
+timepoints |> flatten_int() |>
+  hist(main = "Histogram of 50% prevalence points",
+       xlab = "Timestep when prevalence is 50%")
+```
+
 ## GAM
 
 To check for nonlinearities.
@@ -137,7 +174,36 @@ if (run_gam) {
                   family = binomial(), data = detect_df,
                   cluster = makeCluster(2))
   draw(tensor_gam)
+} else {
+  tensor_gam <- qread(here("Data/Analysis/tensor_gam.qs"))
 }
+sm <- smooth_estimates(tensor_gam, 
+                       data = detect_df |> 
+                         select(CompMeans, FacMeans, strains, sample_prop) |> 
+                         unique() |> slice_sample(n = 20000))
+sample_prop_plot <- sm |> filter(.smooth == "s(sample_prop)") |> 
+  ggplot(aes(x = sample_prop)) + 
+  geom_line(aes(y = .estimate)) +
+  ylab("Partial effect on detectability") +
+  xlab("Proportion of population sampled")
+# Compute suitable width and height for tiles
+width <- (max(sm$FacMeans, na.rm = T) - min(sm$FacMeans, na.rm = T)) / 50
+height <- (max(sm$CompMeans, na.rm = T) - min(sm$CompMeans, na.rm = T)) / 50
+sm_filtered <- sm |> filter(.smooth == "te(CompMeans,FacMeans)")
+
+tensor_smooth <- ggplot(sm |> filter(.smooth == "te(CompMeans,FacMeans)"), 
+       aes(x = FacMeans, y = CompMeans, fill = .estimate)) +
+  geom_tile(width = width, height = height) +
+  scale_fill_gradient2(low = "#1C65A3FF", high = "#CD4101FF", 
+                       mid = "#CACACAFF", midpoint = 0, 
+                       limit = c(min(sm_filtered$.estimate), max(sm_filtered$.estimate)),
+                       name = "Effect on\ndetectability") +
+  xlab("Mean Facilitation") +
+  ylab("Mean Competition")
+
+plot_grid(sample_prop_plot, tensor_smooth, ncol = 1)
+save_plot(here("Figures/Fig 2 GAM results v1.png"), last_plot(),
+          base_height = 7, base_asp = 0.8)
 ```
 
 ## GLM
@@ -145,15 +211,19 @@ if (run_gam) {
 The behavior of the predictors does not look too far from linear, so I will go ahead and do some GLMs. Here is an analysis where I include population as a random effect and competition and facilitation as interactions with time.
 
 ```{r glm}
-detect_glm <- parglm(detect ~ time + time:CompMeans + time:FacMeans + strains +
+if (run_gam) {
+  detect_glm <- parglm(detect ~ time + time:CompMeans + time:FacMeans + strains +
                 sample_prop,
             data = detect_df,
             family = binomial, 
             control = parglm.control(nthreads = 3L))
-library(ggplot2)
+} else {
+  detect_glm <- qread(here("Data/Analysis/detect_glm.qs"))
+}
+
 # Create a dataframe for the coefficients
 coefficients <- data.frame(
-  Term = c("time", "strains", "sample_prop", "time:CompMeans", "time:FacMeans"),
+  Term = c("Time", "Strains", "Proportion\nSampled", "Time/Competition\nInteraction", "Time/Facilitation\nInteraction"),
   Estimate = c(0.1667994, -0.0006991, 4.7302201, -0.2080439, 0.1072236)
 )
 
@@ -163,7 +233,9 @@ ggplot(coefficients, aes(x = Term, y = Estimate, fill = Estimate > 0)) +
   coord_flip() +
   labs(title = "GLM Coefficients", x = "Terms", y = "Coefficient Value") +
   scale_fill_manual(values = c("red", "blue"), name = "Effect", labels = c("Negative", "Positive")) +
-  theme_minimal()
+  theme_minimal_vgrid()
+
+ggsave(here("Figures/Fig 3 GLM coefs v1.png"))
 
 # Generate a grid of values for 'time' and 'CompMeans'
 time_values <- seq(min(detect_df$time), max(detect_df$time), length.out = 100)
@@ -174,23 +246,52 @@ prediction_grid <- expand.grid(time = time_values, CompMeans = comp_means_values
 
 # Assume mean values for other predictors for simplicity
 mean_strains <- mean(detect_df$strains)
-mean_sample_prop <- mean(detect_df$sample_prop)
 mean_fac_means <- mean(detect_df$FacMeans)
 
 # Add constant predictors
 prediction_grid$strains <- mean_strains
-prediction_grid$sample_prop <- mean_sample_prop
+prediction_grid$sample_prop <- 0.1
 prediction_grid$FacMeans <- mean_fac_means
 
 # Predict over the grid
 prediction_grid$Predicted <- predict(detect_glm, newdata = prediction_grid, type = "response")
 
 # Plot
-ggplot(prediction_grid, aes(x = time, y = CompMeans, fill = Predicted)) +
+p1 <- ggplot(prediction_grid, aes(x = time, y = CompMeans, fill = Predicted)) +
   geom_tile() + # or use geom_raster() for large datasets
-  scale_fill_gradient2(low = "purple", high = "green", mid = "white", midpoint = 0.8, 
-                       name = "Probability") +
-  labs(title = "Interaction Effect of 'time' and 'CompMeans'", 
-       x = "Time", y = "CompMeans") +
-  theme_minimal()
+  scale_fill_paletteer_c("grDevices::Mako",
+                       name = "Probability", direction = -1) +
+  labs(title = "Interaction Effect of Time and Competition", 
+       x = "Time", y = "CompMeans")
+
+# Generate a grid of values for 'time' and 'FacMeans'
+time_values <- seq(min(detect_df$time), max(detect_df$time), length.out = 100)
+fac_means_values <- seq(min(detect_df$FacMeans), max(detect_df$FacMeans), length.out = 100)
+
+# Create a grid for prediction
+prediction_grid <- expand.grid(time = time_values, FacMeans = fac_means_values)
+
+# Assume mean values for other predictors for simplicity
+mean_strains <- mean(detect_df$strains)
+mean_comp_means <- mean(detect_df$CompMeans)
+
+# Add constant predictors
+prediction_grid$strains <- mean_strains
+prediction_grid$sample_prop <- 0.1
+prediction_grid$CompMeans <- mean_comp_means
+
+# Predict over the grid
+prediction_grid$Predicted <- predict(detect_glm, newdata = prediction_grid, type = "response")
+
+# Plot
+p2 <- ggplot(prediction_grid, aes(x = time, y = FacMeans, fill = Predicted)) +
+  geom_tile() + 
+  scale_fill_paletteer_c("grDevices::Mako",
+                       name = "Probability", direction = -1) +
+  labs(title = "Interaction Effect of Time and Facilitation", 
+       x = "Time", y = "FacMeans")
+
+plot_grid(p1, p2, ncol = 1)
+save_plot(here("Figures/Fig 4 Time interactions v1.png"), last_plot(), 
+          base_asp = 0.7, base_height = 8)
 ```

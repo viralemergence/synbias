@@ -262,7 +262,7 @@ p1 <- ggplot(prediction_grid, aes(x = time, y = CompMeans, fill = Predicted)) +
   scale_fill_paletteer_c("grDevices::Mako",
                        name = "Probability", direction = -1) +
   labs(title = "Interaction Effect of Time and Competition", 
-       x = "Time", y = "CompMeans")
+       x = "Time", y = "Mean Competition")
 
 # Generate a grid of values for 'time' and 'FacMeans'
 time_values <- seq(min(detect_df$time), max(detect_df$time), length.out = 100)
@@ -289,7 +289,7 @@ p2 <- ggplot(prediction_grid, aes(x = time, y = FacMeans, fill = Predicted)) +
   scale_fill_paletteer_c("grDevices::Mako",
                        name = "Probability", direction = -1) +
   labs(title = "Interaction Effect of Time and Facilitation", 
-       x = "Time", y = "FacMeans")
+       x = "Time", y = "Mean Facilitation")
 
 plot_grid(p1, p2, ncol = 1)
 save_plot(here("Figures/Fig 4 Time interactions v1.png"), last_plot(), 

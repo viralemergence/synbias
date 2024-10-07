@@ -14,6 +14,7 @@ library(data.table)
 library(mgcv)
 library(gratia)
 library(parallel)
+library(ggpointdensity)
 # library(parglm)
 library(cowplot)
 library(paletteer)
@@ -88,18 +89,28 @@ summary(strainDF)
 write_csv(strainDF, here("Data/simulation_round6/simulation_round6_inputs.csv"))
 setDT(strainDF)
 
-strainDF %>% slice_sample(n = 10000) %>% 
+fig1a <- strainDF %>% slice_sample(n = 10000) %>% 
   ggplot(aes(CompStrength, FacStrength)) + 
-  geom_density2d() +
-  geom_point(aes(colour = cf_ratio, size = strains)) +
+  geom_pointdensity() +
   scale_size_continuous(name = "Strains") +
-  scale_color_paletteer_c(name = "C:F Ratio",
+  scale_color_paletteer_c(name = "Density",
                           palette = "grDevices::Cividis") +
   lims(x = c(0, NA), y = c(0, NA)) +
   coord_fixed() +
   xlab("Facilitation Strength") + 
   ylab("Competition Strength")
-ggsave(here("Figures/Fig 1 input distribution v1.png"))
+fig1b <- strainDF |> 
+  slice_sample(n = 10000) %>% 
+  ggplot(aes(CompStrength, FacStrength)) + 
+  geom_point(aes(col = strains)) +
+  lims(x = c(0, NA), y = c(0, NA)) +
+  coord_fixed() +
+  xlab("Facilitation Strength") + 
+  ylab("Competition Strength") +
+  scale_color_paletteer_c(name = "# of Strains",
+                          palette = "pals::cubicyf")
+fig1 <- plot_grid(fig1a, fig1b, ncol = 1, labels = "AUTO")
+ggsave(here("Figures/Fig 1 input distribution v2.png"))
 ```
 
 # Simulate
@@ -125,9 +136,10 @@ if (simulate) {
 
 ```{r sample}
 disease_sample <- function(sim_number, prop) {
-  matrix <- file.path(data_dir, paste0("sim", sim_number, ".qs")) |> qread()
+  matrix <- file.path(data_dir, paste0("sim", sim_number, ".qs")) |> 
+    qread()
   individuals <- round(prop*nrow(matrix))
-  map(1:100, ~matrix[sample(1:nrow(matrix), individuals), , .]) |>
+  df <- map(1:100, ~matrix[sample(1:nrow(matrix), individuals), , .]) |>
     abind::abind(along = 3) |> 
     colSums() |> 
     apply(c(1,2), as.logical) |> 
@@ -135,10 +147,13 @@ disease_sample <- function(sim_number, prop) {
     map(\(dt) data.table(detect = dt, time = 1:100)) |> 
     map2(strainDF[id == sim_number] %>% split(seq_len(nrow(.))), cbind) |> 
     rbindlist()
+  gc()
+  return(df)
 }
 plan(sequential)
 detect_df <- future_map(1:10000, \(i) disease_sample(i, DFList[[i]]$sample_prop)) |>
   rbindlist()
+
 ```
 
 # Analyze
@@ -185,7 +200,8 @@ sample_prop_plot <- sm |> filter(.smooth == "s(sample_prop)") |>
   ggplot(aes(x = sample_prop)) + 
   geom_line(aes(y = .estimate)) +
   ylab("Partial effect on detectability") +
-  xlab("Proportion of population sampled")
+  xlab("Proportion of population sampled") +
+  xlim(0, 1)
 # Compute suitable width and height for tiles
 width <- (max(sm$FacMeans, na.rm = T) - min(sm$FacMeans, na.rm = T)) / 50
 height <- (max(sm$CompMeans, na.rm = T) - min(sm$CompMeans, na.rm = T)) / 50
@@ -201,8 +217,8 @@ tensor_smooth <- ggplot(sm |> filter(.smooth == "te(CompMeans,FacMeans)"),
   xlab("Mean Facilitation") +
   ylab("Mean Competition")
 
-plot_grid(sample_prop_plot, tensor_smooth, ncol = 1)
-save_plot(here("Figures/Fig 2 GAM results v1.png"), last_plot(),
+plot_grid(sample_prop_plot, tensor_smooth, ncol = 1, labels = "AUTO")
+save_plot(here("Figures/Fig 2 GAM results v2.png"), last_plot(),
           base_height = 7, base_asp = 0.8)
 ```
 
@@ -222,13 +238,20 @@ if (run_gam) {
 }
 
 # Create a dataframe for the coefficients
-coefficients <- data.frame(
-  Term = c("Time", "Strains", "Proportion\nSampled", "Time/Competition\nInteraction", "Time/Facilitation\nInteraction"),
-  Estimate = c(0.1667994, -0.0006991, 4.7302201, -0.2080439, 0.1072236)
-)
+coefs <- coef(detect_glm)
+se <- sqrt(diag(vcov(detect_glm)))
+alpha <- 0.05
+z <- qnorm(1 - alpha / 2)
+lower_bound <- coefs - z * se
+upper_bound <- coefs + z * se
+ci <- data.frame(
+  Estimate = coefs,
+  Lower = lower_bound,
+  Upper = upper_bound
+) |> rownames_to_column("Term")
 
 # Plotting
-ggplot(coefficients, aes(x = Term, y = Estimate, fill = Estimate > 0)) +
+ggplot(ci, aes(x = Term, y = Estimate, fill = Estimate > 0)) +
   geom_col() +
   coord_flip() +
   labs(title = "GLM Coefficients", x = "Terms", y = "Coefficient Value") +
@@ -258,9 +281,10 @@ prediction_grid$Predicted <- predict(detect_glm, newdata = prediction_grid, type
 
 # Plot
 p1 <- ggplot(prediction_grid, aes(x = time, y = CompMeans, fill = Predicted)) +
-  geom_tile() + # or use geom_raster() for large datasets
+  geom_tile(aes(fill = Predicted)) + 
   scale_fill_paletteer_c("grDevices::Mako",
                        name = "Probability", direction = -1) +
+  geom_contour(aes(z = Predicted)) +
   labs(title = "Interaction Effect of Time and Competition", 
        x = "Time", y = "Mean Competition")
 
@@ -284,14 +308,15 @@ prediction_grid$CompMeans <- mean_comp_means
 prediction_grid$Predicted <- predict(detect_glm, newdata = prediction_grid, type = "response")
 
 # Plot
-p2 <- ggplot(prediction_grid, aes(x = time, y = FacMeans, fill = Predicted)) +
-  geom_tile() + 
+p2 <- ggplot(prediction_grid, aes(x = time, y = FacMeans)) +
+  geom_tile(aes(fill = Predicted)) + 
   scale_fill_paletteer_c("grDevices::Mako",
                        name = "Probability", direction = -1) +
+  geom_contour(aes(z = Predicted)) +
   labs(title = "Interaction Effect of Time and Facilitation", 
        x = "Time", y = "Mean Facilitation")
 
-plot_grid(p1, p2, ncol = 1)
-save_plot(here("Figures/Fig 4 Time interactions v1.png"), last_plot(), 
+plot_grid(p1, p2, ncol = 1, labels = "AUTO")
+save_plot(here("Figures/Fig 4 Time interactions v2.png"), last_plot(), 
           base_asp = 0.7, base_height = 8)
 ```

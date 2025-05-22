@@ -5,6 +5,7 @@ library(furrr)
 library(Rcpp)
 library(qs)
 library(vroom)
+library(tidyplots)
 source("Scripts/simulation_functions.R")
 sourceCpp("Scripts/ferrari.cpp")
 options(future.globals.maxSize= 9967869120)
@@ -22,15 +23,15 @@ plan(multisession, workers = 2)
 set.seed(306)
 inputs <- sample_data3 %>% rowwise() %>% group_split() %>%
   map(df_to_inputs)
-strains <- inputs |> 
-  map("interactions") |> 
+strains <- inputs |>
+  map("interactions") |>
   map(function(x) {
     x <- x - 1
     t(sapply(1:nrow(x), function(i) {
-      c(sum(abs(c(x[i, ][x[i, ] < 0], x[, i][x[, i] < 0]))), 
+      c(sum(abs(c(x[i, ][x[i, ] < 0], x[, i][x[, i] < 0]))),
         sum(c(x[i, ][x[i, ] > 0], x[, i][x[, i] > 0])))
     }))
-  }) |> 
+  }) |>
   map(~ matrix(.x, ncol = 2, byrow = TRUE)) |>
   map(as.data.frame) |>
   map(\(x) cbind(x, Strain = 1:nrow(x))) |>
@@ -82,7 +83,7 @@ sample_data3$richness_count <-  1:10000 |>
                   timepoint = 35,
                   .progress = T)
 write_csv(sample_data3, "Data/simulation_round5/simulation_round5.csv")
-strains |> 
+strains |>
   left_join(sample_data3, by = c("Simulation" = "id")) |>
   ggplot(aes(x = Competition/strains, y = Facilitation/strains)) +
   geom_bin_2d() +
@@ -156,8 +157,14 @@ ggplot(binned_data, aes(x = sample_prop_mid*100, y = cf_ratio_mid, fill = avg_pe
   scale_y_continuous(breaks = y_breaks, labels = y_labels) +
   theme(axis.title.y = element_blank())
 
-#### Sensitivity Analysis ####
-library(tidymodels)
-tidymodels_prefer()
-time35_split <- initial_split(all_results)
-time35_spec <- rand_forest() |> set_mode("regression")
+# Supplementary info on priority effects
+supp_p1 <- all_results |>
+  tidyplot(x = priority_effects, y = percent_error, color = priority_effects) |>
+  add_mean_bar() |>
+  add_sem_errorbar() |>
+  remove_legend() |>
+  adjust_x_axis_title("Priority Effects") |>
+  adjust_y_axis_title("% Error") |>
+  identity()
+supp_p1
+save_plot(supp_p1, "Figures/Supp_Fig1_priority_effects.png")

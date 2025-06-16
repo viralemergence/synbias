@@ -34,7 +34,8 @@ Simulates multiple pathogen strains spreading through a host population with pos
 - `time_steps::Int`: Number of time steps to simulate.
 - `age_maturity::Int`: Age at which individuals can reproduce.
 - `introduction::String`: How strains are introduced: "simultaneous" (all at once) or 
-  "random" (randomly throughout simulation). Default is "simultaneous".
+  "random" (randomly throughout simulation) or "none" (no infections are introduced by the function). 
+  Default is "simultaneous".
 - `latency::Union{Vector{Int}, Nothing}`: Required for SEIR/SEIRS models. Vector of latency periods 
   for each strain (number of time steps in exposed state).
 - `recovery::Union{Vector{Float64}, Nothing}`: Required for SIR/SEIR/SEIRS models. 
@@ -113,14 +114,18 @@ function coinfection_simulator(;
 	end
 
 	@assert time_steps >= 1 "Time steps must be 1 or greater"
-	@assert introduction in ["simultaneous", "random"] "Introduction of viruses must be simultaneous or random"
+	@assert introduction in ["simultaneous", "random", "none"] "Introduction of viruses must be none, simultaneous or random"
 	@assert age_maturity > 0 "Age of maturity must be greater than 0"
 
 	# Strain introduction timing
 	if introduction == "simultaneous"
 		intro_step = ones(Int, n_strains)
-	else
+	elseif introduction == "random"
 		intro_step = rand(1:time_steps, n_strains)
+	elseif introduction == "none"
+		intro_step = zeros(Int, n_strains)
+	else
+		error("Invalid introduction type: $introduction")
 	end
 
 	# Initialize results

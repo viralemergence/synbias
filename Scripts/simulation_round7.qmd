@@ -1,0 +1,134 @@
+---
+title: "synbias simulations: Round 7"
+author: "July Pilowsky"
+engine: julia
+---
+
+# Goal
+
+To run simulations of coinfection in a host population and determine how interactions between coinfecting strains affect detectability of these strains through imperfect sampling. This round of simulations will include full stratified sampling of all epidemiological parameters, false negative and false positive rates, as well as the balanced sampling of possible species interactions found in previous rounds. This round will be run in Julia using my package `CoinfectionSimulator.jl`.
+
+```{julia setup}
+using CoinfectionSimulator
+using LatinHypercubeSampling
+using DataFrames
+using Random
+using Distributions
+using CSV
+using Tables
+Random.seed!(18)
+n_sims = 10000
+```
+
+# Simulation setup
+
+## Parameters
+
+The following parameters will change across simulations and will be sampled in a stratified manner:
+
+1.  Interaction strength (between strains), 0 - 0.3
+2.  Competition:facilitation ratio, 0.7 - 1.3
+3.  Number of strains, 5 - 100
+4.  Proportion of the population sampled, 0 - 1
+5.  False negative rate, 0 - 0.5
+6.  Disease-induced mortality, 0 - 1
+7.  Transmission, $2*10^{-5}$ - $2*10^{-3}$
+8.  Latency, 1 - 10
+9.  Recovery, 0 - 1
+
+```{julia variables}
+plan, _ = LHCoptim(n_sims, 9, 10)
+scaled_plan = scaleLHC(plan, [(0, 0.3), (0.7, 1.3), (5, 100), (0, 1), 
+                        (0, 0.5), (0, 1), (2e-5, 2e-3), (1, 10), (0, 1)])
+scaled_plan[:,3] = round.(scaled_plan[:,3])
+```
+
+The following parameters will remain constant across all simulations:
+
+1.  Priority effects (all simulations will have priority effects)
+2.  False positive rate (0 across all simulations)
+3.  Initial population size (1000 individuals)
+4.  Disease type (will always be SEIR)
+5.  Baseline host mortality (always 0)
+6.  Host fecundity (always 0)
+7.  Number of time steps (always 100)
+8.  Introduction of strains (always simultaneous at the first timestep)
+
+## Prep interaction matrices
+
+I can create interaction matrices for all the simulations using the `prep_interaction_matrix` function from `CoinfectionSimulator.jl`.
+
+```{julia prep interaction matrices}
+input_df = DataFrame(
+    interaction_strength = scaled_plan[:, 1],
+    cf_ratio = scaled_plan[:, 2],
+    priority_effects = trues(n_sims),
+    strains = scaled_plan[:, 3],
+    proportion_sampled = scaled_plan[:, 4],
+    false_negative = scaled_plan[:, 5],
+    disease_mortality = scaled_plan[:, 6],
+    transmission = scaled_plan[:, 7],
+    latency = scaled_plan[:, 8],
+    recovery = scaled_plan[:, 9]
+)
+CSV.write("Data/simulation_round7_input.csv", input_df)
+matrices = prep_interaction_matrix(input_df)
+```
+
+# Simulation
+
+```{julia simulate}
+n_individuals = 1000
+
+# Age structure
+ages = ones(Int64, n_individuals)
+
+# Collect detection vectors
+results = zeros(n_sims, 100)
+
+# Simulate
+for i in 1:n_sims
+    n_strains = Int(scaled_plan[i, 3])
+    # Initialize population - everyone starts susceptible
+    initial_pop = [falses(n_strains, 4) for _ in 1:n_individuals]
+    for individual in initial_pop
+        individual[:, 1] .= true  # All individuals start susceptible
+    end
+    disease_mortality = rand(Truncated(Normal(scaled_plan[i,6], 1), 0, 1), n_strains)
+    transmission = rand(Truncated(Normal(scaled_plan[i,7], 1), 0, 1), n_strains)
+    latency = round.(Int, rand(Truncated(Normal(scaled_plan[i,8], 1), 1, 10), n_strains))
+    recovery = rand(Truncated(Normal(scaled_plan[i,9], 1), 0, 1), n_strains)
+
+    true_pop = coinfection_simulator(
+        initial_pop = initial_pop,
+        ages = ages, 
+        interactions = matrices[i],
+        disease_type = fill("seir", n_strains),
+        base_mortality = 0.0,
+        disease_mortality = disease_mortality,
+        fecundity = 0.0,
+        transmission = transmission,
+        time_steps = 100,
+        age_maturity = 1,
+        latency = latency,
+        recovery = recovery,
+        introduction = "simultaneous"
+    )
+
+    populations, age_vectors = true_pop
+
+    detections = virtual_ecologist_sample(
+        virtual_population = populations,
+        proportion_sampled = scaled_plan[i, 4],
+        false_positive_rate = 0.0,
+        false_negative_rate = scaled_plan[i, 5]
+    )
+
+    results[i, :] = sum(detections, dims=2)
+end
+
+CSV.write("Data/simulation_round7_output.csv",  
+          Tables.table(results), 
+          writeheader=false)
+```
+

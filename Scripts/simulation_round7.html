@@ -124,7 +124,7 @@ using Distributions
 using CSV
 using Tables
 Random.seed!(18)
-n_sims = 10</code></pre>
+n_sims = 10000</code></pre>
 </section>
 <section id="simulation-setup" class="level1">
 <h1>Simulation setup</h1>
@@ -145,8 +145,7 @@ n_sims = 10</code></pre>
 <pre class="{julia variables}"><code>plan, _ = LHCoptim(n_sims, 9, 10)
 scaled_plan = scaleLHC(plan, [(0, 0.3), (0.7, 1.3), (5, 100), (0, 1), 
                         (0, 0.5), (0, 1), (2e-5, 2e-3), (1, 10), (0, 1)])
-scaled_plan[:,3] = round.(scaled_plan[:,3])
-scaled_plan[:,8] = round.(scaled_plan[:,8])</code></pre>
+scaled_plan[:,3] = round.(scaled_plan[:,3])</code></pre>
 <p>The following parameters will remain constant across all simulations:</p>
 <ol type="1">
 <li>Priority effects (all simulations will have priority effects)</li>
@@ -174,7 +173,7 @@ scaled_plan[:,8] = round.(scaled_plan[:,8])</code></pre>
     latency = scaled_plan[:, 8],
     recovery = scaled_plan[:, 9]
 )
-CSV.write("~/Documents/synbias/Data/simulation_round7_input.csv", input_df)
+CSV.write("Data/simulation_round7_input.csv", input_df)
 matrices = prep_interaction_matrix(input_df)</code></pre>
 </section>
 </section>
@@ -183,14 +182,14 @@ matrices = prep_interaction_matrix(input_df)</code></pre>
 <pre class="{julia simulate}"><code>n_individuals = 1000
 
 # Age structure
-ages = ones(n_individuals)
+ages = ones(Int64, n_individuals)
 
 # Collect detection vectors
 results = zeros(n_sims, 100)
 
 # Simulate
 for i in 1:n_sims
-    n_strains = scaled_plan[i, 3]
+    n_strains = Int(scaled_plan[i, 3])
     # Initialize population - everyone starts susceptible
     initial_pop = [falses(n_strains, 4) for _ in 1:n_individuals]
     for individual in initial_pop
@@ -198,17 +197,17 @@ for i in 1:n_sims
     end
     disease_mortality = rand(Truncated(Normal(scaled_plan[i,6], 1), 0, 1), n_strains)
     transmission = rand(Truncated(Normal(scaled_plan[i,7], 1), 0, 1), n_strains)
-    latency = rand(Truncated(Normal(scaled_plan[i,8], 1), 0, 1), n_strains)
+    latency = round.(Int, rand(Truncated(Normal(scaled_plan[i,8], 1), 1, 10), n_strains))
     recovery = rand(Truncated(Normal(scaled_plan[i,9], 1), 0, 1), n_strains)
 
     true_pop = coinfection_simulator(
         initial_pop = initial_pop,
         ages = ages, 
         interactions = matrices[i],
-        disease_type = ["SEIR" for _ in n_strains],
-        base_mortality = 0,
+        disease_type = fill("seir", n_strains),
+        base_mortality = 0.0,
         disease_mortality = disease_mortality,
-        fecundity = 0,
+        fecundity = 0.0,
         transmission = transmission,
         time_steps = 100,
         age_maturity = 1,
@@ -222,14 +221,14 @@ for i in 1:n_sims
     detections = virtual_ecologist_sample(
         virtual_population = populations,
         proportion_sampled = scaled_plan[i, 4],
-        false_positive_rate = 0,
+        false_positive_rate = 0.0,
         false_negative_rate = scaled_plan[i, 5]
     )
 
-    results[i, :] = sum(detections, 2)
+    results[i, :] = sum(detections, dims=2)
 end
 
-CSV.write("~/Documents/synbias/Data/simulation_round7_output.csv",  
+CSV.write("Data/simulation_round7_output.csv",  
           Tables.table(results), 
           writeheader=false)</code></pre>
 </section>

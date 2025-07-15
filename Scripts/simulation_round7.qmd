@@ -78,6 +78,8 @@ matrices = prep_interaction_matrix(input_df)
 # Simulation
 
 ```{julia simulate}
+input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+matrices = prep_interaction_matrix(input_df)
 n_individuals = 1000
 
 # Age structure
@@ -88,16 +90,16 @@ results = zeros(n_sims, 100)
 
 # Simulate
 for i in 1:n_sims
-    n_strains = Int(scaled_plan[i, 3])
+    n_strains = Int(input_df.strains[i])
     # Initialize population - everyone starts susceptible
     initial_pop = [falses(n_strains, 4) for _ in 1:n_individuals]
     for individual in initial_pop
         individual[:, 1] .= true  # All individuals start susceptible
     end
-    disease_mortality = rand(Truncated(Normal(scaled_plan[i,6], 1), 0, 1), n_strains)
-    transmission = rand(Truncated(Normal(scaled_plan[i,7], 1), 0, 1), n_strains)
-    latency = round.(Int, rand(Truncated(Normal(scaled_plan[i,8], 1), 1, 10), n_strains))
-    recovery = rand(Truncated(Normal(scaled_plan[i,9], 1), 0, 1), n_strains)
+    disease_mortality = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
+    transmission = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
+    latency = round.(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10), n_strains))
+    recovery = rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1), n_strains)
 
     true_pop = coinfection_simulator(
         initial_pop = initial_pop,
@@ -119,9 +121,9 @@ for i in 1:n_sims
 
     detections = virtual_ecologist_sample(
         virtual_population = populations,
-        proportion_sampled = scaled_plan[i, 4],
+        proportion_sampled = input_df.proportion_sampled[i],
         false_positive_rate = 0.0,
-        false_negative_rate = scaled_plan[i, 5]
+        false_negative_rate = input_df.false_negative[i]
     )
 
     results[i, :] = sum(detections, dims=2)

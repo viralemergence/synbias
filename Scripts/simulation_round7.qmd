@@ -133,4 +133,3 @@ CSV.write("Data/simulation_round7_output.csv",
           Tables.table(results), 
           writeheader=false)
 ```
-

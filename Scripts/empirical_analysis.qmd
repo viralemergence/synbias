@@ -1,0 +1,127 @@
+---
+title: "Analysis of Community Coinfection in Empirical Data"
+author: "July Pilowsky"
+format: pdf
+---
+
+```{r setup}
+library(tidyverse)
+library(here)
+library(cooccur)
+library(tidyplots)
+```
+
+# Hechinger et al. snail data
+
+## About the data
+
+Kevin Lafferty and Tara Stewart Merrill and colleagues collected data from intertidal snails (Cerithidopsis californica) at Carpinteria Salt Marsh Reserve from 2012 to 2014, dissecting 58 per site per month to find all of the trematode parasites (out of 20 species.) This parasite community has already been well-characterized in its interactions (Lafferty, Sammond, and Kuris 1994) and is known to be strongly competitive, with some trematodes known to be stronger competitors than others.
+
+## Analytical approach
+
+First, all analyses will be broken down by site and month to remove the possible effect of spatial and temporal clustering on coinfection. I am only comparing snails surveyed on the same date in the same place.
+
+Second, I will characterize the overall structure of community interactions among trematodes. I will do this using a probabilistic model of species co-occurrence (Veech 2012) to find positive and negative associations between trematodes, and note which associations are common across points in space and time, and which pairs consistently have those associations.
+
+Third, I will test theoretical predictions from our simulation model, namely that error in species diversity estimates will increase with more competitive interactions in a community and decrease with more facilitative interactions. I will do this by artificially decreasing the sample size of observations and comparing those estimates to the true figures from the full sample size.
+
+## Community Structure
+
+```{r community structure}
+snail <- read_csv(here("Data/Empirical/Trematode Infections.csv"))
+trematodes <- snail |>
+    select(starts_with("trematode")) |>
+    flatten_chr() |>
+    unique() |>
+    discard(
+        .x = _,
+        ~ is.na(.x)
+    ) |>
+    discard(
+        .x = _,
+        ~ str_detect(.x, "\\?")
+    ) |>
+    discard(
+        .x = _,
+        ~ str_detect(.x, "\\*")
+    ) |>
+    discard(
+        .x = _,
+        ~ str_detect(.x, "\\.")
+    )
+snail_data_prep <- function(df) {
+    df |>
+        pivot_longer(
+            cols = starts_with("trematode"),
+            names_to = "trematode_survey",
+            values_to = "trematode"
+        ) |>
+        filter(trematode %in% trematodes) |>
+        select(`Snail no.`, trematode) |>
+        distinct() |>
+        mutate(presence = TRUE) |>
+        pivot_wider(
+            names_from = trematode, # The species names become columns
+            values_from = presence, # TRUE/FALSE based on presence
+            values_fill = FALSE, # Fill absent species with FALSE
+            id_cols = `Snail no.`,
+            id_expand = TRUE
+        ) |>
+        column_to_rownames(var = "Snail no.") |>
+        as.matrix() |>
+        t()
+}
+cooccurrence_matrices <- snail |>
+    group_by(site, survey) |>
+    group_split() |>
+    map(snail_data_prep)
+cooccurrence_analyses <- cooccurrence_matrices |>
+    map(\(m) try(cooccur(m,
+        thresh = F, spp_names = TRUE,
+        prob = "comb"
+    )))
+ggplot() +
+    geom_density(aes(x = map_int(cooccurrence_analyses, "positive")),
+        color = "blue"
+    ) +
+    geom_density(aes(x = map_int(cooccurrence_analyses, "negative")),
+        color = "orange"
+    ) +
+    xlab("Number of Associations per Site/Month") +
+    ggtitle("Species Associations (blue = positive, orange = negative)") +
+    theme_bw()
+```
+
+We can see from this plot that negative associations between species (indicating competition within hosts) are much more common than positive associations (indicating facilitation between parasites.) This graph only includes those associations considered to be significant (that is to say, the probability that species co-occur less than expected (or more than expected) is less than 0.05.)
+
+```{r competition:facilitation}
+df_cf <- snail |> 
+    pivot_longer(
+            cols = starts_with("trematode"),
+            names_to = "trematode_survey",
+            values_to = "trematode"
+        ) |>
+    filter(trematode %in% trematodes) |>
+    group_by(site, survey) |> 
+    summarize(true_species_richness = n_distinct(trematode)) |>
+    ungroup() |>
+    mutate(facilitative_pairs = map_int(cooccurrence_analyses, "positive"),
+          competitive_pairs = map_int(cooccurrence_analyses, "negative"))
+df_cf |>
+    group_by(competitive_pairs, facilitative_pairs) |>
+    summarize(count = n()) |>
+    tidyplot(x = competitive_pairs, y = facilitative_pairs, fill = count) |>
+    add_heatmap() |>
+    adjust_x_axis_title("# of Competing Pairs") |>
+    adjust_y_axis_title("# of Facilitating Pairs") |>
+    adjust_title("Trematode Community Interactions")
+df_cf |>
+    ggplot() +
+    geom_point(aes(x = species_richness, y = facilitative_pairs), color = "blue") +
+    geom_smooth(aes(x = species_richness, y = facilitative_pairs), color = "blue") +
+    geom_point(aes(x = species_richness, y = competitive_pairs), color = "orange") +
+    geom_smooth(aes(x = species_richness, y = competitive_pairs), color = "orange") +
+    ggtitle("Species Richness as Confounder")
+```
+
+We can see here that most trematode communities (by site/month) have no facilitating pairs and 1 or 2 competing pairs. Also, while number of competing pairs is relatively flat with species richness, the number of facilitating pairs goes up with species richness, so it will have to be controlled for when testing theoretical predictions (not to mention the fact that increased species richness increases bias in estimates in and of itself.)

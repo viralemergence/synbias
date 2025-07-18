@@ -1,0 +1,1653 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Hechinger, R.F.</origin>
+        <origin>Wood, A.C.</origin>
+        <origin>Stewart, T.E.</origin>
+        <origin>Ashford, J.E.</origin>
+        <origin>Kuris, A.M.</origin>
+        <origin>Lafferty, K.D.</origin>
+        <pubdate>20170502</pubdate>
+        <title>Monthly trematode infections of the snail Cerithideopsis (Cerithidea) californica at Carpinteria Salt Marsh, California USA, February 2012 to January 2014</title>
+        <geoform>Tabular Digital Data Set (csv)</geoform>
+        <onlink>http://doi.org/10.5066/F7348HJB</onlink>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>Each month (except March 2012), we collected detailed data on the infection status of intertidal snails from ten fixed sites as part of a broader effort to understand food webs in California Estuaries. The study site was Carpinteria Salt Marsh Reserve, California USA, (University of California Natural Reserve System), which comprises 9 Ha tidal channels, 2 Ha salt flats, 17 Ha upland habitat, 6 Ha tidal pans, 52 Ha vegetated marsh, 2 Ha tidal flats. Each site was a fixed location in channel or flat habitat, with a diameter approximately 50 m in size, centered at the site location marker used in Kuris et al. (2008).  At each site/month, we collected, measured, sexed, and dissected ~58 snails (11,643 dissections total, 5,886 of which were infected with at least one trematode species), describing trematode infections to one of 20 species. To collect snails for dissections, transects were placed randomly at flats sites.  For channel sites, transects were placed randomly on the channel bank with the highest snail density.  Each transect started 20 cm within the vegetated margin, and extended downslope to the deepest part of the channel or interior of the pan or to a maximum length of 10 m. For every 20 cm decrease in elevation, we established a new transect segment, or quadrat. Specifically, we systematically placed transects at intervals stratified within targeted habitat types: channels, pans, or marsh (or planar habitat that was mixed marsh and pan). 
+
+For lattitude and longitude coordinates of sites please refer to:
+Buck, J.C., Wood, A.C., Cook, I.M., and Lafferty, K.D., (in press), Parasite Recruitment and Host Risk in a Snail-Trematode System at Carpinteria Salt Marsh: U.S. Geological Survey data release, http://dx.doi.org/10.5066/F7GX48P2. 
+
+References:
+Kuris, A. M., R. F. Hechinger, J. C. Shaw, K. L. Whitney, L. Aguirre-Macedo, C. A. Boch, A. P. Dobson, E. J. Dunham, B. L. Fredensborg, T. C. Huspeni, J. Lorda, L. Mababa, F. Mancini, A. B. Mora, M. Pickering, N. L. Talhouk, M. E. Torchin, and K. D. Lafferty. 2008. Ecosystem energetic implications of parasite and free-living biomass in three estuaries. Nature 454:515-518.</abstract>
+      <purpose>These data were collected as part of a broader effort to understand food webs in California Estuaries, with particular reference to trematode life cycles.</purpose>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>20120201</begdate>
+          <enddate>20140131</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>observed</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>None planned</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-119.54535349</westbc>
+        <eastbc>-119.5262487</eastbc>
+        <northbc>34.405836436</northbc>
+        <southbc>34.394584289</southbc>
+      </bounding>
+      <descgeog>WGS 84</descgeog>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>None</themekt>
+        <themekey>estuary</themekey>
+        <themekey>salt marsh</themekey>
+        <themekey>snail</themekey>
+        <themekey>distribution</themekey>
+        <themekey>mapping</themekey>
+        <themekey>trematodes</themekey>
+        <themekey>habitat</themekey>
+      </theme>
+      <theme>
+        <themekt>USGS Metadata Identifier</themekt>
+        <themekey>USGS:583f21dae4b04fc80e3b5a37</themekey>
+      </theme>
+      <place>
+        <placekt>None</placekt>
+        <placekey>Carpinteria</placekey>
+        <placekey>California</placekey>
+        <placekey>Santa Barbara County</placekey>
+        <placekey>Carpinteria Salt Marsh Reserve</placekey>
+      </place>
+    </keywords>
+    <accconst>None.</accconst>
+    <useconst>The authors of these data require that users direct any questions pertaining to appropriate use or assistance with understanding limitations and interpretation of the data to the individuals/organization listed in the Point of Contact section.</useconst>
+    <ptcontac>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey, Western Ecological Research Center</cntorg>
+          <cntper>Kevin D Lafferty</cntper>
+        </cntorgp>
+        <cntpos>Research Ecologist</cntpos>
+        <cntaddr>
+          <addrtype>mailing address</addrtype>
+          <address>UC Santa Barbara</address>
+          <city>Santa Barbara</city>
+          <state>CA</state>
+          <postal>93106</postal>
+        </cntaddr>
+        <cntvoice>805-893-8778</cntvoice>
+        <cntfax>805-893-8062</cntfax>
+        <cntemail>klafferty@usgs.gov</cntemail>
+      </cntinfo>
+    </ptcontac>
+    <native>Environment as of Metadata Creation: Microsoft Windows 7 Version 6.1 (Build 7601) Service Pack 1; Esri ArcGIS 10.3.1 (Build 4959) Service Pack N/A (Build N/A)</native>
+  </idinfo>
+  <dataqual>
+    <attracc>
+      <attraccr>Snails sometimes are buried, but efforts were made to find them by feeling with fingers.</attraccr>
+    </attracc>
+    <logic>Data were cross-checked in Excel using Pivot Tables for names, and checked using GIS for points falling outside the survey area or into incorrect habitat (if so, they were reassigned).</logic>
+    <complete>Unknown</complete>
+    <posacc>
+      <horizpa>
+        <horizpar>Location data were sensitive to the accuracy of the Garmin hand-held GPS, but assumed to be good to within 5m, and ideally 2m.</horizpar>
+      </horizpa>
+      <vertacc>
+        <vertaccr>A formal accuracy assessment of the vertical positional information in the data set has either not been conducted, or is not applicable.</vertaccr>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <procstep>
+        <procdesc>The data were entered as points into ArcGIS 10</procdesc>
+        <procdate>20130730</procdate>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <spdoinfo>
+    <direct>Point</direct>
+    <ptvctinf>
+      <sdtsterm>
+        <sdtstype>Entity point</sdtstype>
+        <ptvctcnt>21486</ptvctcnt>
+      </sdtsterm>
+    </ptvctinf>
+  </spdoinfo>
+  <eainfo>
+    <detailed>
+      <enttyp>
+        <enttypl>Attribute Table</enttypl>
+        <enttypd>Table containing attribute information associated with the data set.</enttypd>
+        <enttypds>Producer defined</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>site</attrlabl>
+        <attrdef>Name of site where samples were taken.  "(original)" in parentheses indicates that the site was moved.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>Letter-number sample site code where c indicates channel habitat and f indicates mudflat/pan habitat.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>Snail no.</attrlabl>
+        <attrdef>The code for each individual snail nested within a survey.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1</rdommin>
+            <rdommax>104</rdommax>
+            <attrunit>integer</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>survey</attrlabl>
+        <attrdef>The month and year that the survey was completed (ignore the day).</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>Feb-12</rdommin>
+            <rdommax>Jan-14</rdommax>
+            <attrunit>date</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>collection date</attrlabl>
+        <attrdef>The month, day and year the samples were collected for the survey.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>2/14/2012</rdommin>
+            <rdommax>1/14/2014</rdommax>
+            <attrunit>date</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>collected by</attrlabl>
+        <attrdef>personnel code of people who collected the samples. UG =Undergrad and BREN = UCSB Bren School of Environmental Management</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>RH</edomv>
+            <edomvd>Ryan Hechinger</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>AW</edomv>
+            <edomvd>Alan Wood</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TS</edomv>
+            <edomvd>Tara Stewart</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>JA</edomv>
+            <edomvd>Jake Ashford</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alex S.</edomv>
+            <edomvd>Alex Sun, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Andrew</edomv>
+            <edomvd>Andrew Turner, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Maggie</edomv>
+            <edomvd>Maggie Espinoza, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Daisy</edomv>
+            <edomvd>Dasiy Lemus, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Kevin</edomv>
+            <edomvd>Kevin Lamb, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Sarah</edomv>
+            <edomvd>Sarah Peters, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Nico</edomv>
+            <edomvd>Nicodemus Solorio, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Aristea</edomv>
+            <edomvd>Aristea Lubar, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Paola</edomv>
+            <edomvd>Paola, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Richard</edomv>
+            <edomvd>Richard Hong, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Eric</edomv>
+            <edomvd>Eric Tenort, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Thira</edomv>
+            <edomvd>Thira Khor, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Savannah</edomv>
+            <edomvd>Savannah Perez, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Todd</edomv>
+            <edomvd>Todd Carlin, Bren</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alex</edomv>
+            <edomvd>Alex Jensen, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Ian</edomv>
+            <edomvd>Ian Cook, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Jessica Arbon</edomv>
+            <edomvd>Jessica Arbon, visiting UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Crystal</edomv>
+            <edomvd>Crystal Dolis, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Gretchen</edomv>
+            <edomvd>Gretchen Grebe, Bren</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alanna</edomv>
+            <edomvd>Alanna, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Nichole</edomv>
+            <edomvd>Nichole, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>dissection date</attrlabl>
+        <attrdef>The month, day and year the samples were dissected for the survey.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>2/16/2012</rdommin>
+            <rdommax>1/21/2014</rdommax>
+            <attrunit>date</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>dissected by</attrlabl>
+        <attrdef>personnel code of people who dissected the samples. UG =Undergrad and BREN = UCSB Bren School of Environmental Management</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>RH</edomv>
+            <edomvd>Ryan Hechinger</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>AW</edomv>
+            <edomvd>Alan Wood</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TS</edomv>
+            <edomvd>Tara Stewart</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>JA</edomv>
+            <edomvd>Jake Ashford</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alex S.</edomv>
+            <edomvd>Alex Sun, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Andrew</edomv>
+            <edomvd>Andrew Turner, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Maggie</edomv>
+            <edomvd>Maggie Espinoza, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Daisy</edomv>
+            <edomvd>Dasiy Lemus, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Kevin</edomv>
+            <edomvd>Kevin Lamb, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Sarah</edomv>
+            <edomvd>Sarah Peters, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Nico</edomv>
+            <edomvd>Nicodemus Solorio, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Aristea</edomv>
+            <edomvd>Aristea Lubar, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Paola</edomv>
+            <edomvd>Paola, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Richard</edomv>
+            <edomvd>Richard Hong, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Eric</edomv>
+            <edomvd>Eric Tenort, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Thira</edomv>
+            <edomvd>Thira Khor, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Savannah</edomv>
+            <edomvd>Savannah Perez, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Todd</edomv>
+            <edomvd>Todd Carlin, Bren</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alex</edomv>
+            <edomvd>Alex Jensen, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Ian</edomv>
+            <edomvd>Ian Cook, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Jessica Arbon</edomv>
+            <edomvd>Jessica Arbon, visiting UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Crystal</edomv>
+            <edomvd>Crystal Dolis, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Gretchen</edomv>
+            <edomvd>Gretchen Grebe, Bren</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alanna</edomv>
+            <edomvd>Alanna, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Nichole</edomv>
+            <edomvd>Nichole, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Melanie P</edomv>
+            <edomvd>Melanie P</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>.</edomv>
+            <edomvd>Not recorded</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>processed by</attrlabl>
+        <attrdef>personnel code of people who processed the samples. UG =Undergrad and BREN = UCSB Bren School of Environmental Management</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>RH</edomv>
+            <edomvd>Ryan Hechinger</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>AW</edomv>
+            <edomvd>Alan Wood</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TS</edomv>
+            <edomvd>Tara Stewart</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>JA</edomv>
+            <edomvd>Jake Ashford</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alex S.</edomv>
+            <edomvd>Alex Sun, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Andrew</edomv>
+            <edomvd>Andrew Turner, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Maggie</edomv>
+            <edomvd>Maggie Espinoza, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Daisy</edomv>
+            <edomvd>Dasiy Lemus, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Kevin</edomv>
+            <edomvd>Kevin Lamb, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Sarah</edomv>
+            <edomvd>Sarah Peters, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Nico</edomv>
+            <edomvd>Nicodemus Solorio, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Aristea</edomv>
+            <edomvd>Aristea Lubar, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Paola</edomv>
+            <edomvd>Paola, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Richard</edomv>
+            <edomvd>Richard Hong, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Eric</edomv>
+            <edomvd>Eric Tenort, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Thira</edomv>
+            <edomvd>Thira Khor, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Savannah</edomv>
+            <edomvd>Savannah Perez, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Todd</edomv>
+            <edomvd>Todd Carlin, Bren</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alex</edomv>
+            <edomvd>Alex Jensen, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Ian</edomv>
+            <edomvd>Ian Cook, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Jessica Arbon</edomv>
+            <edomvd>Jessica Arbon, visiting UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Crystal</edomv>
+            <edomvd>Crystal Dolis, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Gretchen</edomv>
+            <edomvd>Gretchen Grebe, Bren</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Alanna</edomv>
+            <edomvd>Alanna, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Nichole</edomv>
+            <edomvd>Nichole, UG</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>Melanie P</edomv>
+            <edomvd>Melanie P</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>buried?</attrlabl>
+        <attrdef>Depth of sample.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>b</edomv>
+            <edomvd>buried</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>e</edomv>
+            <edomvd>exposed</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>.</edomv>
+            <edomvd>not recorded</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>length (mm)</attrlabl>
+        <attrdef>snail shell length</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>5</rdommin>
+            <rdommax>39.6</rdommax>
+            <attrunit>millimeters (. = not recorded)</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>sex</attrlabl>
+        <attrdef>sex of snail.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>m</edomv>
+            <edomvd>male</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>f</edomv>
+            <edomvd>female</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>.</edomv>
+            <edomvd>not measured or immature</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>parth/ gonad state 1 (r,p,n)</attrlabl>
+        <attrdef>For uninfected snails or for the first trematode species in infected snails</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>r</edomv>
+            <edomvd>ripe: gonad filled with either yolk or sperm, and no significant spaces in acini or rediae/sporocysts filling appropriate site of infection, plump with cercariae</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>p</edomv>
+            <edomvd>producing: at least 10 cercariae present, but rediae/sporcysts not plump, and don't necessarily fill entire site of infection</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>not ripe: does not meet "ripe" criteria or less than 10 cercariae present and rediae/sporocysts usually do not fill site of infection</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>.</edomv>
+            <edomvd>not measured</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>parth/ gonad state 2 (r,p,n)</attrlabl>
+        <attrdef>For the second trematode species seen in the snail</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>r</edomv>
+            <edomvd>ripe: rediae/sporocysts filling appropriate site of infection, plump with cercariae</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>p</edomv>
+            <edomvd>producing: at least 10 cercariae present, but rediae/sporcysts not plump, and don't necessarily fill entire site of infection</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>not ripe: less than 10 cercariae present and rediae/sporocysts usually do not fill site of infection.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>see notes</edomv>
+            <edomvd>see notes for further information</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>parth/ gonad state 3 (r,p,n)</attrlabl>
+        <attrdef>For the third trematode species seen in the snail</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>r</edomv>
+            <edomvd>ripe: rediae/sporocysts filling appropriate site of infection, plump with cercariae</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>p</edomv>
+            <edomvd>producing: at least 10 cercariae present, but rediae/sporcysts not plump, and don't necessarily fill entire site of infection</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>not ripe: less than 10 cercariae present and rediae/sporocysts usually do not fill site of infection.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>early 1? (y/n)</attrlabl>
+        <attrdef>Is the 1st trematode species an early infection</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>y</edomv>
+            <edomvd>yes</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>no</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>early 2? (y/n)</attrlabl>
+        <attrdef>Is the 2nd trematode species an early infection</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>y</edomv>
+            <edomvd>yes</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>no</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>early 3? (y/n)</attrlabl>
+        <attrdef>Is the 3rd trematode species an early infection</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>y</edomv>
+            <edomvd>yes</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>no</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>trematode 1</attrlabl>
+        <attrdef>Trematode species identity of the first trematode species infection in the snail.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>u</edomv>
+            <edomvd>uninfected</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>acan</edomv>
+            <edomvd>Acanthoparyphium spinulosum</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>aust</edomv>
+            <edomvd>Austrobilharzia sp.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>cata</edomv>
+            <edomvd>Catatropis johnstoni</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>cloa</edomv>
+            <edomvd>Cloacitrema michiganensis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>euha</edomv>
+            <edomvd>Euhaplorchis californiensis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>him*</edomv>
+            <edomvd>Himasthla sp.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>hima</edomv>
+            <edomvd>Himasthla rhigedana</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>himb</edomv>
+            <edomvd>Himasthla sp. B</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imec</edomv>
+            <edomvd>immature echinostome</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imht</edomv>
+            <edomvd>immature heterophyid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imren</edomv>
+            <edomvd>immature renicolid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>lgxi</edomv>
+            <edomvd>large xiphidiocercaria</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>meso</edomv>
+            <edomvd>Mesostephanus appendiculatus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>paro</edomv>
+            <edomvd>Parorchis acanthus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>phoc</edomv>
+            <edomvd>Phocitremoides ovale</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>prob</edomv>
+            <edomvd>Probolocoryphe sp. A</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>pygi</edomv>
+            <edomvd>Pygidiopsoides spindalis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>rema</edomv>
+            <edomvd>Renicola martini</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>renb</edomv>
+            <edomvd>Renicola buchanani</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>renc</edomv>
+            <edomvd>Renicola cerithidicola</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>repo</edomv>
+            <edomvd>Renicola polychaetophila</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>smcy</edomv>
+            <edomvd>small cyathocotylid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>stic</edomv>
+            <edomvd>Stictodora hancocki</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>. or ?</edomv>
+            <edomvd>not recorded or unidentified</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>trematode 2</attrlabl>
+        <attrdef>Trematode species identity of the second trematode species infection in the snail.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>u</edomv>
+            <edomvd>uninfected</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>acan</edomv>
+            <edomvd>Acanthoparyphium spinulosum</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>aust</edomv>
+            <edomvd>Austrobilharzia sp.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>cata</edomv>
+            <edomvd>Catatropis johnstoni</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>cloa</edomv>
+            <edomvd>Cloacitrema michiganensis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>euha</edomv>
+            <edomvd>Euhaplorchis californiensis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>him*</edomv>
+            <edomvd>Himasthla sp.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>hima</edomv>
+            <edomvd>Himasthla rhigedana</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>himb</edomv>
+            <edomvd>Himasthla sp. B</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imec</edomv>
+            <edomvd>immature echinostome</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imht</edomv>
+            <edomvd>immature heterophyid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imren</edomv>
+            <edomvd>immature renicolid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>lgxi</edomv>
+            <edomvd>large xiphidiocercaria</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>meso</edomv>
+            <edomvd>Mesostephanus appendiculatus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>paro</edomv>
+            <edomvd>Parorchis acanthus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>phoc</edomv>
+            <edomvd>Phocitremoides ovale</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>prob</edomv>
+            <edomvd>Probolocoryphe sp. A</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>pygi</edomv>
+            <edomvd>Pygidiopsoides spindalis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>rema</edomv>
+            <edomvd>Renicola martini</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>renb</edomv>
+            <edomvd>Renicola buchanani</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>renc</edomv>
+            <edomvd>Renicola cerithidicola</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>repo</edomv>
+            <edomvd>Renicola polychaetophila</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>smcy</edomv>
+            <edomvd>small cyathocotylid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>stic</edomv>
+            <edomvd>Stictodora hancocki</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>trematode 3</attrlabl>
+        <attrdef>Trematode species identity of the third trematode species infection in the snail.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>u</edomv>
+            <edomvd>uninfected</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>acan</edomv>
+            <edomvd>Acanthoparyphium spinulosum</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>aust</edomv>
+            <edomvd>Austrobilharzia sp.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>cata</edomv>
+            <edomvd>Catatropis johnstoni</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>cloa</edomv>
+            <edomvd>Cloacitrema michiganensis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>euha</edomv>
+            <edomvd>Euhaplorchis californiensis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>him*</edomv>
+            <edomvd>Himasthla sp.</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>hima</edomv>
+            <edomvd>Himasthla rhigedana</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>himb</edomv>
+            <edomvd>Himasthla sp. B</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imec</edomv>
+            <edomvd>immature echinostome</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imht</edomv>
+            <edomvd>immature heterophyid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>imren</edomv>
+            <edomvd>immature renicolid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>lgxi</edomv>
+            <edomvd>large xiphidiocercaria</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>meso</edomv>
+            <edomvd>Mesostephanus appendiculatus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>paro</edomv>
+            <edomvd>Parorchis acanthus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>phoc</edomv>
+            <edomvd>Phocitremoides ovale</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>prob</edomv>
+            <edomvd>Probolocoryphe sp. A</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>pygi</edomv>
+            <edomvd>Pygidiopsoides spindalis</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>rema</edomv>
+            <edomvd>Renicola martini</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>renb</edomv>
+            <edomvd>Renicola buchanani</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>renc</edomv>
+            <edomvd>Renicola cerithidicola</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>repo</edomv>
+            <edomvd>Renicola polychaetophila</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>smcy</edomv>
+            <edomvd>small cyathocotylid</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>stic</edomv>
+            <edomvd>Stictodora hancocki</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>fixed for genetics?</attrlabl>
+        <attrdef>Archived in alcohol for future DNA extraction</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>y</edomv>
+            <edomvd>yes</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>no</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>crab dam (n,s,a)</attrlabl>
+        <attrdef>Crab damage.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>n</edomv>
+            <edomvd>no damage</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>s</edomv>
+            <edomvd>spire</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>a</edomv>
+            <edomvd>aperture</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>.</edomv>
+            <edomvd>not recorded</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>MCs hima</attrlabl>
+        <attrdef>Number of Himasthla metacercariae counted on the snail.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>38</rdommax>
+            <attrunit>integer (. = not recorded)</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>cata</attrlabl>
+        <attrdef>Number of Catatropis metacercariae counted on the snail.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>34</rdommax>
+            <attrunit>integer (. = not recorded)</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>phil</attrlabl>
+        <attrdef>Number of Philopthalmid metacercariae counted on the snail.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0</rdommin>
+            <rdommax>21</rdommax>
+            <attrunit>integer (. = not recorded)</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>notes</attrlabl>
+        <attrdef>Acount of further observations.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>Free form</udom>
+        </attrdomv>
+      </attr>
+    </detailed>
+    <overview>
+      <eaover>The entity and attribute information provided here describes the tabular data associated with the data set. Please review the detailed descriptions that are provided (the individual attribute descriptions) for information on the values that appear as fields/table entries of the data set.</eaover>
+      <eadetcit>The entity and attribute information was generated by the individual and/or agency identified as the originator of the data set. Please review the rest of the metadata record for additional details and information.</eadetcit>
+    </overview>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey - ScienceBase</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>Mailing and Physical</addrtype>
+          <address>Denver Federal Center</address>
+          <address>Building 810</address>
+          <address>Mail Stop 302</address>
+          <city>Denver</city>
+          <state>CO</state>
+          <postal>80225</postal>
+        </cntaddr>
+        <cntvoice>1-888-275-8747</cntvoice>
+        <cntemail>sciencebase@usgs.gov</cntemail>
+      </cntinfo>
+    </distrib>
+    <distliab>Unless otherwise stated, all data, metadata and related materials are considered to satisfy the quality standards relative to the purpose for which the data were collected. Although these data and associated metadata have been reviewed for accuracy and completeness and approved for release by the U.S. Geological Survey (USGS), no warranty expressed or implied is made regarding the display or utility of the data on any other system or for general or scientific purposes, nor shall the act of distribution constitute any such warranty. Any use of trade, firm, or product names is for descriptive purposes only and does not imply endorsement by the U.S. Government.</distliab>
+    <stdorder>
+      <digform>
+        <digtinfo>
+          <formname>Tabular Digital Data Set (Table)</formname>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>http://doi.org/10.5066/F7348HJB</networkr>
+              </networka>
+            </computer>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <fees>None. No fees are applicable for obtaining the data set.</fees>
+    </stdorder>
+  </distinfo>
+  <metainfo>
+    <metd>20200827</metd>
+    <metc>
+      <cntinfo>
+        <cntperp>
+          <cntper>Erika Sanchez-Chopitea</cntper>
+          <cntorg>U.S. Geological Survey, Western Ecological Research Center</cntorg>
+        </cntperp>
+        <cntpos>Cartographic Tech</cntpos>
+        <cntaddr>
+          <addrtype>mailing address</addrtype>
+          <address>3020 State University Drive</address>
+          <address>Suite 4004</address>
+          <city>Sacramento</city>
+          <state>CA</state>
+          <postal>95819</postal>
+        </cntaddr>
+        <cntvoice>916-278-9483</cntvoice>
+        <cntemail>esanchez-chopitea@usgs.gov</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+  </metainfo>
+</metadata>

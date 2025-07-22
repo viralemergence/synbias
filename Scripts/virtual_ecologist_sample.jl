@@ -14,7 +14,7 @@ virtual_ecologist_sample = function (;
 
 	n_viruses = size(virtual_population[1][1], 1)
 	timesteps = length(virtual_population)
-	individuals_sampled = round(Int, proportion_sampled * size(virtual_population[sample_timestep], 1))
+	individuals_sampled = round(Int, proportion_sampled * size(virtual_population, 1))
 	detect_matrix = falses(timesteps, n_viruses)
 
 	for i in 1:timesteps

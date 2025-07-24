@@ -11,7 +11,9 @@ library(here)
 library(cooccur)
 library(tidyplots)
 library(GGally)
-library(lme4)
+library(gpboost)
+knitr::opts_chunk$set(dpi = 300, dev = "png")
+options(list(dplyr.summarise.inform = FALSE, future.rng.onMisuse = "ignore"))
 daphnia <- readxl::read_excel(
   here("Data/Empirical/Parasite_data.xlsx"),
   col_types = c(
@@ -64,7 +66,12 @@ daphnia <- readxl::read_excel(
     "text"
   )
 )
-snail <- read_csv(here("Data/Empirical/Trematode Infections.csv"))
+snail <- read_csv(here("Data/Empirical/Trematode Infections.csv"), show_col_types = FALSE)
+quiet <- function(x) { 
+  sink(tempfile()) 
+  on.exit(sink()) 
+  invisible(force(x)) 
+} 
 ```
 
 # Hechinger et al. snail data
@@ -132,7 +139,7 @@ cooccurrence_matrices <- snail |>
     group_split() |>
     map(snail_data_prep)
 cooccurrence_analyses <- cooccurrence_matrices |>
-    map(\(m) try(cooccur(m,
+    map(\(m) quiet(cooccur(m,
         thresh = F, spp_names = TRUE,
         prob = "comb"
     )))
@@ -151,6 +158,17 @@ ggplot() +
 We can see from this plot that negative associations between species (indicating competition within hosts) are much more common than positive associations (indicating facilitation between parasites.) This graph only includes those associations considered to be significant (that is to say, the probability that species co-occur less than expected (or more than expected) is less than 0.05.)
 
 ```{r competition:facilitation}
+trematode_stats <- snail |>
+  pivot_longer(
+    cols = starts_with("trematode"),
+    names_to = "trematode_survey",
+    values_to = "trematode"
+  ) |>
+  group_by(`Snail no.`, site, survey) |>
+  reframe(infection_intensity = 1 - str_count(trematode, "^u$")) |>
+  filter(!is.na(infection_intensity)) |>
+  group_by(site, survey) |>
+  summarize(sum_infection_intensity = sum(infection_intensity)) 
 df_cf <- snail |> 
     pivot_longer(
             cols = starts_with("trematode"),
@@ -162,7 +180,8 @@ df_cf <- snail |>
     summarize(true_species_richness = n_distinct(trematode)) |>
     ungroup() |>
     mutate(facilitative_pairs = map_int(cooccurrence_analyses, "positive"),
-          competitive_pairs = map_int(cooccurrence_analyses, "negative"))
+          competitive_pairs = map_int(cooccurrence_analyses, "negative")) |>
+    left_join(trematode_stats, by = join_by(site, survey))
 df_cf |>
     group_by(competitive_pairs, facilitative_pairs) |>
     summarize(count = n()) |>
@@ -173,111 +192,16 @@ df_cf |>
     adjust_title("Trematode Community Interactions")
 df_cf |>
     ggplot() +
-    geom_point(aes(x = species_richness, y = facilitative_pairs), color = "blue") +
-    geom_smooth(aes(x = species_richness, y = facilitative_pairs), color = "blue") +
-    geom_point(aes(x = species_richness, y = competitive_pairs), color = "orange") +
-    geom_smooth(aes(x = species_richness, y = competitive_pairs), color = "orange") +
+    geom_point(aes(x = true_species_richness, y = facilitative_pairs), color = "blue") +
+    geom_smooth(aes(x = true_species_richness, y = facilitative_pairs), color = "blue",
+      method = "loess", formula = 'y ~ x') +
+    geom_point(aes(x = true_species_richness, y = competitive_pairs), color = "orange") +
+    geom_smooth(aes(x = true_species_richness, y = competitive_pairs), color = "orange", 
+      method = "loess", formula = 'y ~ x') +
     ggtitle("Species Richness as Confounder")
 ```
 
 We can see here that most trematode communities (by site/month) have no facilitating pairs and 1 or 2 competing pairs. Also, while number of competing pairs is relatively flat with species richness, the number of facilitating pairs goes up with species richness, so it will have to be controlled for when testing theoretical predictions (not to mention the fact that increased species richness increases bias in estimates in and of itself.)
-To put this in the same framework as our theoretical modeling, what I will do is calculate for each site/month a metric of the strength of facilitation (measured as probability that species co-occur more than expected, summed for all pairs) and a metric of the strength of competition (measured as probability that species co-occur less than expected, summed for all pairs.)
-
-```{r community structure}
-facilitation_strength <- cooccurrence_analyses |> 
-  map(prob.table) |> 
-  map("p_gt") |> 
-  map(\(v) 1-v) |> 
-  map_dbl(sum)
-competition_strength <- cooccurrence_analyses |> 
-  map(prob.table) |> 
-  map("p_lt") |> 
-  map(\(v) 1-v) |> 
-  map_dbl(sum)
-snail |> group_by(site, survey) |> group_keys() |> 
-  mutate(facilitation_strength = facilitation_strength,
-         competition_strength = competition_strength,
-         parasite_richness = cooccurrence_matrices |> map_int(nrow)) |> 
-  tidyplot(x = facilitation_strength, y = competition_strength, 
-           color = parasite_richness) |> 
-  add_data_points() |> 
-  add_annotation_line(x = 0, xend = 2.5, y = 0, yend = 2.5) |> 
-  adjust_x_axis_title("Facilitation Strength") |> 
-  adjust_y_axis_title("Competition Strength") |> 
-  adjust_colors(name = "Parasite\nRichness")
-```
-
-I added a line to show where we would expect the data points to cluster if competition and facilitation strength were equal. Instead, almost everything is strongly skewed toward competition.
-
-## By Species
-
-I now want to analyze these interactions by species: how many competitive relationships do they have (and how many facilitative)? The first thing I need to do is check whether these relationships are consistent across time and space, because if they're not, I'll have to analyze these species within specific contexts.
-
-```{r consistency}
-cooccurrence_all <- cooccurrence_analyses |> map(prob.table) |> 
-  map(\(df) select(df, sp1_name, sp2_name, p_lt, p_gt)) |> 
-  imap(~bind_cols(.x, group_keys(group_by(snail, site, survey))[.y,])) |> 
-  bind_rows()
-cooccurrence_all |> group_by(sp1_name, sp2_name) |> 
-  mutate(mean_comp = 1 - mean(p_lt), mean_fac = 1 - mean(p_gt)) |> 
-  filter(mean_comp > 0.1, mean_fac > 0.1) |> 
-  group_keys()
-```
-
-Here's something really interesting. There are a few pairs of trematode species that flips whether they are competitive or facilitative, sometimes within the same site. The pairs that do this quite a bit are *Himasthla rhigedana* and immature heterophyids, *Himasthla rhigedana* and *Renicola martini*, and *Probolocoryphe* and cyathocotylids.
-
-There are more pairs that vary along the spectrum from being competitive to being neutral/random in their association:
-
-```{r variation in competition}
-cooccurrence_all |> group_by(sp1_name, sp2_name) |> 
-  mutate(mean_comp = 1 - mean(p_lt), mean_fac = 1 - mean(p_gt),
-         deviation_comp = abs((1-p_lt) - mean_comp), 
-         deviation_fac = abs((1-p_gt) - mean_fac),
-         mean_deviation_comp = mean(deviation_comp)) |> 
-  filter(mean_deviation_comp > 0.2) |> 
-  arrange(sp1_name, sp2_name)
-```
-
-It is not unexpected that the degree of competition might vary across space and time.
-
-Since facilitation is rare in this system, I'm also curious about which species facilitate each other consistently.
-
-```{r consistent facilitation}
-cooccurrence_all |> group_by(sp1_name, sp2_name) |> 
-  mutate(mean_fac = 1 - mean(p_gt), mean_comp = 1 - mean(p_lt)) |> 
-  filter(mean_fac > 0.1, mean_comp < 0.1) |> 
-  arrange(sp1_name, sp2_name) |> 
-  group_keys()
-```
-
-What I notice about these "facilitative" pairs when I examine them in detail is that they are mostly neutral in their interactions and only occasionally facilitative.
-
-Our theoretical expectation from the simulation modeling is that species with more competitive interactions should be less detectable than species with more neutral or facilitative interactions. We can test that expectation here using subsampling. Most of the site/month surveys have the same sample size, 58 snails. What we can do is bootstrap different random subsamples for each site/month survey and note whether the various parasite species are detected or not in the subsamples, then use strength of competitive interactions for that species as a predictor of detectability.
-
-I will start by calculating strength of competitive and facilitative interactions for each parasite species at each site/month survey.
-
-```{r by-species interaction strength}
-by_species <- trematodes |>
-  map(\(t) filter(cooccurrence_all, if_any(1:2, ~ str_detect(.x, t)))) |>
-  map(\(df) df |> summarize(
-    comp_strength = sum(1 - p_lt),
-    fac_strength = sum(1 - p_gt),
-    .by = site:survey
-  )) |>
-  map2(trematodes, ~ mutate(.x, species = rep(.y))) |>
-  bind_rows() |> 
-  arrange(site, survey, species) |> 
-  bind_cols()
-by_species |> 
-  tidyplot(x = fac_strength, y = comp_strength, 
-           color = species) |> 
-  add_data_points() |> 
-  add_annotation_line(x = 0, xend = 2.5, y = 0, yend = 2.5) |> 
-  adjust_x_axis_title("Facilitation Strength") |> 
-  adjust_y_axis_title("Competition Strength")
-```
-
-Now I will bootstrap subsamples of the survey data to get detectability values by species.
 
 ```{r simulate detectability}
 library(furrr)
@@ -286,86 +210,74 @@ plan(multicore)
 bootstrap_detect <- future_map(
   1:1000,
   ~ snail %>%
-      group_by(site, survey) %>%
-      slice_sample(n = 10) %>%
-      pivot_longer(
-        cols = starts_with("trematode"),
-        names_to = "trematode_survey",
-        values_to = "trematode"
-      ) %>%
-      filter(trematode %in% trematodes) %>%
-      distinct(`Snail no.`, trematode, site, survey) %>%
-      mutate(presence = TRUE) %>%
-      right_join(by_species,
-                 by = join_by(site, survey, trematode == species)) %>%
-      mutate(presence = replace_na(presence, FALSE)),
-  .progress = TRUE
-)
-bootstrap_detect |> bind_rows() |> group_by(site, survey, trematode) |> 
-  summarize(Detectability = sum(presence)/n()) |> 
-  right_join(by_species, by = join_by(site, survey, trematode == species)) |> 
-  tidyplot(x = fac_strength, y = comp_strength, color = Detectability) |> 
-  add_data_points() |> 
-  adjust_x_axis_title("Facilitation Strength") |> 
-  adjust_y_axis_title("Competition Strength")
+    group_by(site, survey) %>%
+    slice_sample(n = 10) %>%
+    pivot_longer(
+      cols = starts_with("trematode"),
+      names_to = "trematode_survey",
+      values_to = "trematode"
+    ) %>%
+    filter(trematode %in% trematodes) %>%
+    distinct(`Snail no.`, trematode, site, survey) %>%
+    group_by(site, survey) |>
+    summarize(richness_estimate = n_distinct(trematode)) %>%
+    right_join(df_cf, by = join_by(site, survey))
+) |>
+  bind_rows()
+bootstrap_detect |>
+  mutate(
+    bias = abs(true_species_richness - richness_estimate) /
+      true_species_richness
+  ) |>
+  group_by(competitive_pairs, facilitative_pairs) |>
+  summarize(mean_bias = mean(bias)) |>
+  tidyplot(x = facilitative_pairs, y = competitive_pairs, fill = mean_bias) |>
+  add_heatmap() |>
+  adjust_x_axis_title("# of Facilitative Pairs") |>
+  adjust_y_axis_title("# of Competitive Pairs")
 ```
 
 This is the opposite of our expectation; however, I suspect that it is an artefact of parasite richness and infection intensity at different sites. I will test this suspicion using a correlogram.
 
 ```{r correlations}
-trematode_stats <- snail |>
-  pivot_longer(
-    cols = starts_with("trematode"),
-    names_to = "trematode_survey",
-    values_to = "trematode"
-  ) |>
-  group_by(`Snail no.`, site, survey) |>
-  reframe(infection_intensity = 1 - str_count(trematode, "^u$")) |>
-  filter(!is.na(infection_intensity)) |>
-  group_by(site, survey) |>
-  summarize(sum_infection_intensity = sum(infection_intensity)) |>
-  ungroup() |>
-  mutate(parasite_richness = map_int(cooccurrence_analyses, "species"))
-mean_prevalence <- cooccurrence_matrices |> 
-  map(rowMeans) |> 
-  map(as.data.frame, nm = "mean_prevalence") |> 
-  map(rownames_to_column, var = "trematode") |> 
-  map2(group_split(rowwise(group_keys(group_by(snail, site, survey)))),
-       ~bind_cols(.x, .y)) |> 
-  bind_rows() 
 bootstrap_detect |> 
-  bind_rows() |> 
-  group_by(site, survey, trematode) |>
-  summarize(Detectability = sum(presence) / n()) |>
   ungroup() |>
-  arrange(site, survey, trematode) |> 
-  right_join(by_species, by = join_by(site, survey, trematode == species)) |>
-  left_join(trematode_stats) |>
-  left_join(mean_prevalence) |> 
+  mutate(bias = abs(true_species_richness - richness_estimate)/true_species_richness) |> 
   select(
+    bias,
+    true_species_richness,
     sum_infection_intensity,
-    parasite_richness,
-    fac_strength,
-    comp_strength,
-    mean_prevalence,
-    Detectability
+    facilitative_pairs,
+    competitive_pairs
   ) |>
   ggpairs()
 ```
 
-Let's see if the (insanely strong) correlation between competition strength and detectability persists when I control for other factors:
+Let's see if the correlation between competition strength and bias persists when I run a linear mixed model.
 
-```{r glmer}
-snail_mod <- bootstrap_detect |> 
-  bind_rows() |> 
-  left_join(trematode_stats) |>
-  left_join(mean_prevalence) |> 
-  glmer(data = _,
-        formula = presence ~ comp_strength + fac_strength + 
-          sum_infection_intensity + parasite_richness + mean_prevalence + 
-          (1|site),
-        family = binomial)
+```{r lmm, warning = FALSE, message = FALSE}
+bias <- bootstrap_detect |>
+  mutate(
+    bias = abs(true_species_richness - richness_estimate) /
+      true_species_richness
+  ) |>
+  pull(bias)
+fixed_effects <- as.matrix(bootstrap_detect[, 4:7])
+random_effects <- cbind(
+  bootstrap_detect$site,
+  get_nested_categories(bootstrap_detect$site, bootstrap_detect$survey)
+)
+gp_model <- fitGPModel(
+  likelihood = "gaussian",
+  group_data = random_effects,
+  y = bias,
+  X = fixed_effects,
+  params = list(std_dev = TRUE)
+)
+summary(gp_model)
 ```
+
+The effect of competition and facilitation on bias is negative and significant, but the effect is very small. The only predictor that really affects bias in a significant way is true species richness.
 
 # Tara's *Daphnia* data
 
@@ -416,30 +328,6 @@ ggplot() +
 ```
 
 This result is very different from the snail/trematode system. The associations are much more likely to be neutral, and there doesn't seem to be any salient difference in positive vs. negative associations.
-
-```{r daphnia community structure}
-facilitation_strength <- cooccurrence_analyses |> 
-  map(prob.table) |> 
-  map("p_gt") |> 
-  map(\(v) 1-v) |> 
-  map_dbl(sum)
-competition_strength <- cooccurrence_analyses |> 
-  map(prob.table) |> 
-  map("p_lt") |> 
-  map(\(v) 1-v) |> 
-  map_dbl(sum)
-daphnia |> group_by(lake, `date collected`) |> group_keys() |> 
-  mutate(facilitation_strength = facilitation_strength,
-         competition_strength = competition_strength,
-         parasite_richness = cooccurrence_matrices |> map_int(nrow)) |> 
-  tidyplot(x = facilitation_strength, y = competition_strength) |> 
-  add_data_points() |> 
-  add_annotation_line(x = 0, xend = 2.5, y = 0, yend = 2.5) |> 
-  adjust_x_axis_title("Facilitation Strength") |> 
-  adjust_y_axis_title("Competition Strength")
-```
-
-This distribution of associations is much closer to the 1:1 correlation between competition and facilitation strength, with most points clustered toward low-strength interactions. There is a slight bias toward competitive interactions. (I didn't include parasite richness here because it is the same at all sites.)
 
 ## By Species
 

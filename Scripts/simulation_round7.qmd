@@ -16,6 +16,11 @@ using Random
 using Distributions
 using CSV
 using Tables
+using Tidier
+using MLJ
+using TidierPlots
+using BetaML
+using Shapley
 Random.seed!(18)
 n_sims = 10000
 ```
@@ -27,7 +32,7 @@ n_sims = 10000
 The following parameters will change across simulations and will be sampled in a stratified manner:
 
 1.  Interaction strength (between strains), 0 - 0.3
-2.  Competition:facilitation ratio, 0.7 - 1.3
+2.  Competition:facilitation ratio, 0.3 - 0.7
 3.  Number of strains, 5 - 100
 4.  Proportion of the population sampled, 0 - 1
 5.  False negative rate, 0 - 0.5
@@ -38,9 +43,9 @@ The following parameters will change across simulations and will be sampled in a
 
 ```{julia variables}
 plan, _ = LHCoptim(n_sims, 9, 10)
-scaled_plan = scaleLHC(plan, [(0, 0.3), (0.7, 1.3), (5, 100), (0, 1), 
-                        (0, 0.5), (0, 1), (2e-5, 2e-3), (1, 10), (0, 1)])
-scaled_plan[:,3] = round.(scaled_plan[:,3])
+scaled_plan = scaleLHC(plan, [(0, 0.3), (0.3, 0.7), (5, 100), (0, 1),
+	(0, 0.5), (0, 1), (2e-5, 2e-3), (1, 10), (0, 1)])
+scaled_plan[:, 3] = round.(scaled_plan[:, 3])
 ```
 
 The following parameters will remain constant across all simulations:
@@ -60,16 +65,16 @@ I can create interaction matrices for all the simulations using the `prep_intera
 
 ```{julia prep interaction matrices}
 input_df = DataFrame(
-    interaction_strength = scaled_plan[:, 1],
-    cf_ratio = scaled_plan[:, 2],
-    priority_effects = trues(n_sims),
-    strains = scaled_plan[:, 3],
-    proportion_sampled = scaled_plan[:, 4],
-    false_negative = scaled_plan[:, 5],
-    disease_mortality = scaled_plan[:, 6],
-    transmission = scaled_plan[:, 7],
-    latency = scaled_plan[:, 8],
-    recovery = scaled_plan[:, 9]
+	interaction_strength = scaled_plan[:, 1],
+	cf_ratio = scaled_plan[:, 2],
+	priority_effects = trues(n_sims),
+	strains = scaled_plan[:, 3],
+	proportion_sampled = scaled_plan[:, 4],
+	false_negative = scaled_plan[:, 5],
+	disease_mortality = scaled_plan[:, 6],
+	transmission = scaled_plan[:, 7],
+	latency = scaled_plan[:, 8],
+	recovery = scaled_plan[:, 9],
 )
 CSV.write("Data/simulation_round7_input.csv", input_df)
 matrices = prep_interaction_matrix(input_df)
@@ -90,46 +95,164 @@ results = zeros(n_sims, 100)
 
 # Simulate
 for i in 1:n_sims
-    n_strains = Int(input_df.strains[i])
-    # Initialize population - everyone starts susceptible
-    initial_pop = [falses(n_strains, 4) for _ in 1:n_individuals]
-    for individual in initial_pop
-        individual[:, 1] .= true  # All individuals start susceptible
-    end
-    disease_mortality = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
-    transmission = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
-    latency = round.(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10), n_strains))
-    recovery = rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1), n_strains)
+	n_strains = Int(input_df.strains[i])
+	# Initialize population - everyone starts susceptible
+	initial_pop = [falses(n_strains, 4) for _ in 1:n_individuals]
+	for individual in initial_pop
+		individual[:, 1] .= true  # All individuals start susceptible
+	end
+	disease_mortality = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
+	transmission = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
+	latency = round.(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10), n_strains))
+	recovery = rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1), n_strains)
 
-    true_pop = coinfection_simulator(
-        initial_pop = initial_pop,
-        ages = ages, 
-        interactions = matrices[i],
-        disease_type = fill("seir", n_strains),
-        base_mortality = 0.0,
-        disease_mortality = disease_mortality,
-        fecundity = 0.0,
-        transmission = transmission,
-        time_steps = 100,
-        age_maturity = 1,
-        latency = latency,
-        recovery = recovery,
-        introduction = "simultaneous"
-    )
+	true_pop = coinfection_simulator(
+		initial_pop = initial_pop,
+		ages = ages,
+		interactions = matrices[i],
+		disease_type = fill("seir", n_strains),
+		base_mortality = 0.0,
+		disease_mortality = disease_mortality,
+		fecundity = 0.0,
+		transmission = transmission,
+		time_steps = 100,
+		age_maturity = 1,
+		latency = latency,
+		recovery = recovery,
+		introduction = "simultaneous",
+	)
 
-    populations, age_vectors = true_pop
+	populations, age_vectors = true_pop
 
-    detections = virtual_ecologist_sample(
-        virtual_population = populations,
-        proportion_sampled = input_df.proportion_sampled[i],
-        false_positive_rate = 0.0,
-        false_negative_rate = input_df.false_negative[i]
-    )
+	detections = virtual_ecologist_sample(
+		virtual_population = populations,
+		proportion_sampled = input_df.proportion_sampled[i],
+		false_positive_rate = 0.0,
+		false_negative_rate = input_df.false_negative[i],
+	)
 
-    results[i, :] = sum(detections, dims=2)
+	results[i, :] = sum(detections, dims = 2)
 end
 
-CSV.write("Data/simulation_round7_output.csv",  
-          Tables.table(results), 
-          writeheader=false)
+CSV.write("Data/simulation_round7_output.csv",
+	Tables.table(results),
+	writeheader = false)
+```
+
+# Analysis
+
+To analyze the results, I first need to pair them up with the input parameters that produced them.
+
+```{julia analysis dataset}
+# Read the data back in
+input_parameters = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
+	@mutate(sim = 1:10000) # simulation IDs
+end
+simulation_output = @chain CSV.read("Data/simulation_round7_output.csv", DataFrame, header = false) begin
+	@mutate(sim = 1:10000) # simulation IDs
+	@pivot_longer(cols = 1:100,
+		names_to = "timestep",
+		values_to = "Detections")
+	transform!(:timestep => ByRow(x -> parse(Int, replace(x, "Column" => ""))) => :timestep)
+	@left_join(input_parameters, sim) # add input parameters
+	@mutate(error_rate = abs(strains - Detections) / strains) # calculate error rate
+end
+
+for col in names(simulation_output)
+	if eltype(simulation_output[!, col]) >: Missing
+		# Remove Missing from the column type
+		simulation_output[!, col] = identity.(simulation_output[!, col])
+	end
+end
+
+ggplot(simulation_output) +
+    geom_histogram(aes(x = :error_rate), bins = 50) +
+    scale_y_log10()
+```
+
+It seems that most of the samples result in no detections, which is to say an error rate of 1. This is likely because a SEIR model with no demography will often result in a disease that burns itself out fairly quickly, so there are no strains to detect after a certain point in the simulations.
+
+Now I will use a machine learning algorithm to find which input parameters affect the error rate the most.
+
+```{julia sensitivity analysis}
+# Prep data 
+y, X = unpack(simulation_output, ==(:error_rate), colname -> colname ∉ (:sim, :Detections), rng = 18)
+train, test = MLJ.partition(eachindex(y), 0.7, shuffle = true, rng = 18)
+X_train, y_train = X[train, :], y[train]
+X_test, y_test = X[test, :], y[test]
+# Tune the neural net 
+Nnet = @load NeuralNetworkRegressor pkg = BetaML
+nnet = Nnet()
+r1 = range(nnet, :batch_size, lower = 8, upper = 256)
+r2 = range(nnet, :epochs, lower = 10, upper = 200)
+quick_tuned = TunedModel(
+	model = nnet,
+	tuning = RandomSearch(),
+	resampling = Holdout(fraction_train = 0.8),
+	range = [r1, r2],
+	measure = rms,
+	n = 10
+)
+# Use subset of data for initial tuning
+subset_idx = 1:50000
+mach_quick = machine(quick_tuned, X_train[subset_idx, :], y_train[subset_idx, :])
+MLJ.fit!(mach_quick)
+# Fine-tune
+best_params = fitted_params(mach_quick).best_model # epochs: 171, batch size: 162
+margin_bs = 16
+new_lower_bs = max(8, best_params.batch_size - margin_bs)
+new_upper_bs = min(256, best_params.batch_size + margin_bs)
+margin_epochs = 16
+new_lower_epochs = max(10, best_params.epochs - margin_epochs)
+new_upper_epochs = min(200, best_params.epochs + margin_epochs)
+println("Refined batch size range: ", new_lower_bs, " to ", new_upper_bs)
+println("Refined epochs range: ", new_lower_epochs, " to ", new_upper_epochs)
+
+# Refined tuning
+r_bs = range(nnet, :batch_size, lower = new_lower_bs, upper = new_upper_bs)
+r_ep = range(nnet, :epochs, lower = new_lower_epochs, upper = new_upper_epochs)
+refined_tuned = TunedModel(
+	model = nnet,
+	tuning = RandomSearch(),
+	resampling = Holdout(fraction_train = 0.8),
+	range = [r_bs, r_ep],
+	measure = rms,
+	n = 8
+)
+mach_refined = machine(refined_tuned, X_train, y_train)
+MLJ.fit!(mach_refined) # epochs: 176, batch size: 158
+# Prediction on test set
+yhat = predict(mach_refined, X_test)
+println("MAPE: ", mape(yhat, y_test))
+MLJ.save("Data/simulation_round7_model.jlso", mach_refined)
+```
+
+The model scores very well on MAPE (mean absolute percentage error) on the test data which indicates a good model fit. Now let's look at the importance of each of the input parameters.
+
+```{julia shapley_values}
+# Read model back in
+mach_refined = machine("Data/simulation_round7_model.jlso")
+shap_df = DataFrame(Shapley.summary(x -> MLJ.predict(mach_refined, x), Shapley.MonteCarlo(100), X_test))
+show(shap_df, allrows = true)
+CSV.write("Data/round7_shapley_summary.csv", shap_df)
+ϕ = shapley(x -> MLJ.predict(mach_refined, x), Shapley.MonteCarlo(100), X_test)
+# Convert Shapley values to DataFrame
+shap_full_df = DataFrame(; ϕ...)
+timestep_plot =
+	ggplot(shap_full_df) +
+	geom_point(aes(x = :timestep_value, y = :timestep)) +
+	geom_smooth(aes(x = :timestep_value, y = :timestep)) +
+	labs(x = "Timestep Value",
+		y = "Shapley Value for Timestep",
+		title = "Shapley Values vs Feature Values: Timestep") +
+	theme_minimal()
+ggsave(timestep_plot, "Figures/partial_dependence_timestep.png")
+cf_ratio_plot =
+	ggplot(shap_full_df) +
+	geom_point(aes(x = :cf_ratio_value, y = :cf_ratio)) +
+	geom_smooth(aes(x = :cf_ratio_value, y = :cf_ratio)) +
+	labs(x = "Competition to Facilitation Ratio (<1 competitive)",
+		y = "Shapley Value for C:F ratio",
+		title = "Explainer: Competition to Facilitation Ratio") +
+	theme_minimal()
 ```

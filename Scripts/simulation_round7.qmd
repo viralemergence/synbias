@@ -30,20 +30,20 @@ n_sims = 10000
 
 The following parameters will change across simulations and will be sampled in a stratified manner:
 
-1.  Interaction strength (between strains), 0 - 0.3
-2.  Competition:facilitation ratio, 0.3 - 0.7
-3.  Number of strains, 5 - 100
+1.  Interaction strength (between strains), 0 - 0.5
+2.  Competition:facilitation ratio, 0.2 - 0.8
+3.  Number of strains, 5 - 50
 4.  Proportion of the population sampled, 0 - 1
 5.  False negative rate, 0 - 0.5
-6.  Disease-induced mortality, 0 - 1
-7.  Transmission, $2*10^{-5}$ - $2*10^{-3}$
-8.  Latency, 1 - 10
-9.  Recovery, 0 - 1
+6.  Disease-induced mortality, 0 - 0.5
+7.  Transmission, 0 - 0.1
+8.  Latency, 1 - 20
+9.  Recovery, 0 - 0.1
 
 ```{julia variables}
 plan, _ = LHCoptim(n_sims, 9, 10)
-scaled_plan = scaleLHC(plan, [(0, 0.3), (0.3, 0.7), (5, 100), (0, 1),
-	(0, 0.5), (0, 1), (2e-5, 2e-3), (1, 10), (0, 1)])
+scaled_plan = scaleLHC(plan, [(0, 0.5), (0.2, 0.8), (5, 50), (0, 1),
+	(0, 0.5), (0, 0.5), (0, 0.1), (1, 20), (0, 0.1)])
 scaled_plan[:, 3] = round.(scaled_plan[:, 3])
 ```
 
@@ -186,6 +186,7 @@ input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priori
 simulation_output <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:10000] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
+    _[timestep < 10,] |>
     merge(x = _, y = input_parameters, by = "sim") |>
     _[, error_rate := abs(strains - Detections) / strains]
 synbias_split <- initial_split(simulation_output[, -c("sim", "Detections")], strata = error_rate)
@@ -220,7 +221,7 @@ tune_spec <- boost_tree(
 # best_tree <- synbias_res |> select_best(metric = "rmse") # trees = 1555, min_n = 23, learn_rate = 0.316, tree_depth = 10, loss_reduction = 1.90e-9, sample_size = 1, mtry = 8
 final_wf <- workflow() |>
     add_model(tune_spec) |>
-    add_formula(error_rate ~ cf_ratio:interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+    add_formula(error_rate ~ cf_ratio*interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
     finalize_workflow(best_tree)
 final_fit <- final_wf %>%
     last_fit(synbias_split)
@@ -238,8 +239,8 @@ Let's examine this more closely using plots of Shapley values.
 
 ```{r shapley_plots}
 # Create the model matrix using the same formula as workflow
-formula <- error_rate ~ cf_ratio:interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
-train_matrix <- synbias_test[sample(1:250000, 2500)] |> # downsample or it'll take forever
+formula <- error_rate ~ cf_ratio*interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
+train_matrix <- synbias_test |>
     model.matrix(object = formula, data = _) |>
     _[, -1] # remove intercept
 
@@ -257,5 +258,5 @@ shap.plot.summary(shap_long)
 
 source(here("Scripts/shapley_plots.R"))
 library(patchwork)
-partial.dependence.plot(colnames(train_matrix), shap_long, as.data.frame(train_matrix), c("#FF4D6FFF", "#579EA4FF", "#DF7713FF", "#F9C000FF", "#86AD34FF", "#5D7298FF", "#81B28DFF", "#7E1A2FFF", "#2D2651FF", "#C8350DFF", "#BD777AFF"))
+partial.dependence.plot(colnames(train_matrix), shap_long, as.data.frame(train_matrix), c("#4F6980FF", "#849DB1FF", "#A2CEAAFF", "#638B66FF", "#BFBB60FF", "#F47942FF", "#FBB04EFF", "#B66353FF", "#D7CE9FFF", "#B9AA97FF", "#7E756DFF"))
 ```

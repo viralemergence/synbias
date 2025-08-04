@@ -1,7 +1,6 @@
 ---
 title: "synbias simulations: Round 7"
 author: "July Pilowsky"
-engine: julia
 ---
 
 # Goal
@@ -174,85 +173,89 @@ It seems that most of the samples result in no detections, which is to say an er
 
 Now I will use a machine learning algorithm to find which input parameters affect the error rate the most.
 
-```{julia sensitivity analysis}
-# Prep data 
-y, X = unpack(simulation_output, ==(:error_rate), colname -> colname ∉ (:sim, :Detections), rng = 18)
-train, test = MLJ.partition(eachindex(y), 0.7, shuffle = true, rng = 18)
-X_train, y_train = X[train, :], y[train]
-X_test, y_test = X[test, :], y[test]
-# Tune the neural net 
-Nnet = @load NeuralNetworkRegressor pkg = BetaML
-nnet = Nnet()
-r1 = range(nnet, :batch_size, lower = 8, upper = 256)
-r2 = range(nnet, :epochs, lower = 10, upper = 200)
-quick_tuned = TunedModel(
-	model = nnet,
-	tuning = RandomSearch(),
-	resampling = Holdout(fraction_train = 0.8),
-	range = [r1, r2],
-	measure = rms,
-	n = 10
-)
-# Use subset of data for initial tuning
-subset_idx = 1:50000
-mach_quick = machine(quick_tuned, X_train[subset_idx, :], y_train[subset_idx, :])
-MLJ.fit!(mach_quick)
-# Fine-tune
-best_params = fitted_params(mach_quick).best_model # epochs: 171, batch size: 162
-margin_bs = 16
-new_lower_bs = max(8, best_params.batch_size - margin_bs)
-new_upper_bs = min(256, best_params.batch_size + margin_bs)
-margin_epochs = 16
-new_lower_epochs = max(10, best_params.epochs - margin_epochs)
-new_upper_epochs = min(200, best_params.epochs + margin_epochs)
-println("Refined batch size range: ", new_lower_bs, " to ", new_upper_bs)
-println("Refined epochs range: ", new_lower_epochs, " to ", new_upper_epochs)
+```{r analyze simulation output}
+library(data.table)
+library(here)
+library(tidymodels)
+library(stringr)
+library(vip)
+library(future)
+plan(multicore)
 
-# Refined tuning
-r_bs = range(nnet, :batch_size, lower = new_lower_bs, upper = new_upper_bs)
-r_ep = range(nnet, :epochs, lower = new_lower_epochs, upper = new_upper_epochs)
-refined_tuned = TunedModel(
-	model = nnet,
-	tuning = RandomSearch(),
-	resampling = Holdout(fraction_train = 0.8),
-	range = [r_bs, r_ep],
-	measure = rms,
-	n = 8
-)
-mach_refined = machine(refined_tuned, X_train, y_train)
-MLJ.fit!(mach_refined) # epochs: 176, batch size: 158
-# Prediction on test set
-yhat = predict(mach_refined, X_test)
-println("MAPE: ", mape(yhat, y_test))
-MLJ.save("Data/simulation_round7_model.jlso", mach_refined)
+input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects")][, sim := 1:10000]
+simulation_output <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:10000] |>
+    melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
+    _[, timestep := as.numeric(str_sub(timestep, 2))] |>
+    merge(x = _, y = input_parameters, by = "sim") |>
+    _[, error_rate := abs(strains - Detections) / strains]
+synbias_split <- initial_split(simulation_output[, -c("sim", "Detections")], strata = error_rate)
+synbias_train <- training(synbias_split)
+synbias_test <- testing(synbias_split)
+tune_spec <- boost_tree(
+    # trees = tune(),
+    # min_n = tune(),
+    # learn_rate = tune(),
+    # tree_depth = tune(),
+    # loss_reduction = tune(),
+    # sample_size = tune(),
+    # mtry = tune(),
+    trees = 1555,
+    min_n = 23,
+    learn_rate = 0.316,
+    tree_depth = 10,
+    loss_reduction = 1.90e-9,
+    sample_size = 1,
+    mtry = 8,
+    stop_iter = 1000
+) |>
+    set_engine("xgboost") |>
+    set_mode("regression")
+# synbias_folds <- vfold_cv(synbias_train, 4)
+# synbias_res <- workflow() |>
+#     add_model(tune_spec) |>
+#     add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+#     tune_grid(
+#         resamples = synbias_folds
+#     )
+# best_tree <- synbias_res |> select_best(metric = "rmse") # trees = 1555, min_n = 23, learn_rate = 0.316, tree_depth = 10, loss_reduction = 1.90e-9, sample_size = 1, mtry = 8
+final_wf <- workflow() |>
+    add_model(tune_spec) |>
+    add_formula(error_rate ~ cf_ratio:interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+    finalize_workflow(best_tree)
+final_fit <- final_wf %>%
+    last_fit(synbias_split)
+final_fit %>%
+    collect_metrics()
+final_fit |>
+    extract_workflow() |>
+    extract_fit_parsnip() %>%
+    vip()
 ```
 
-The model scores very well on MAPE (mean absolute percentage error) on the test data which indicates a good model fit. Now let's look at the importance of each of the input parameters.
+In the end, a very interesting result. The strong effects of timestep, number of strains, and proportion sampled were expected. It's interesting that latency is the most important epidemiological parameter in terms of the error rate on pathogen richness. Competition to facilitation ratio is more important than either recovery rate or transmission rate in determining the error rate.
 
-```{julia shapley_values}
-# Read model back in
-mach_refined = machine("Data/simulation_round7_model.jlso")
-shap_df = DataFrame(Shapley.summary(x -> MLJ.predict(mach_refined, x), Shapley.MonteCarlo(100), X_test))
-show(shap_df, allrows = true)
-CSV.write("Data/round7_shapley_summary.csv", shap_df)
-ϕ = shapley(x -> MLJ.predict(mach_refined, x), Shapley.MonteCarlo(100), X_test)
-# Convert Shapley values to DataFrame
-shap_full_df = DataFrame(; ϕ...)
-timestep_plot =
-	ggplot(shap_full_df) +
-	geom_point(aes(x = :timestep_value, y = :timestep)) +
-	geom_smooth(aes(x = :timestep_value, y = :timestep)) +
-	labs(x = "Timestep Value",
-		y = "Shapley Value for Timestep",
-		title = "Shapley Values vs Feature Values: Timestep") +
-	theme_minimal()
-ggsave(timestep_plot, "Figures/partial_dependence_timestep.png")
-cf_ratio_plot =
-	ggplot(shap_full_df) +
-	geom_point(aes(x = :cf_ratio_value, y = :cf_ratio)) +
-	geom_smooth(aes(x = :cf_ratio_value, y = :cf_ratio)) +
-	labs(x = "Competition to Facilitation Ratio (<1 competitive)",
-		y = "Shapley Value for C:F ratio",
-		title = "Explainer: Competition to Facilitation Ratio") +
-	theme_minimal()
+Let's examine this more closely using plots of Shapley values.
+
+```{r shapley_plots}
+# Create the model matrix using the same formula as workflow
+formula <- error_rate ~ cf_ratio:interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
+train_matrix <- synbias_test[sample(1:250000, 2500)] |> # downsample or it'll take forever
+    model.matrix(object = formula, data = _) |>
+    _[, -1] # remove intercept
+
+# Extract the xgboost model
+xgb_model <- final_fit %>%
+    extract_workflow() %>%
+    extract_fit_parsnip() %>%
+    .$fit
+
+# Compute SHAP values
+library(SHAPforxgboost)
+shapley_data <- shap.values(xgb_model, as.matrix(train_matrix))
+shap_long <- shap.prep(shap_contrib = shapley_data$shap_score, X_train = train_matrix)
+shap.plot.summary(shap_long)
+
+source(here("Scripts/shapley_plots.R"))
+library(patchwork)
+partial.dependence.plot(colnames(train_matrix), shap_long, as.data.frame(train_matrix), c("#FF4D6FFF", "#579EA4FF", "#DF7713FF", "#F9C000FF", "#86AD34FF", "#5D7298FF", "#81B28DFF", "#7E1A2FFF", "#2D2651FF", "#C8350DFF", "#BD777AFF"))
 ```

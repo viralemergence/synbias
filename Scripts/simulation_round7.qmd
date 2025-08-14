@@ -1,6 +1,7 @@
 ---
 title: "synbias simulations: Round 7"
 author: "July Pilowsky"
+format: html
 ---
 
 # Goal
@@ -43,8 +44,7 @@ The following parameters will change across simulations and will be sampled in a
 ```{julia variables}
 plan, _ = LHCoptim(n_sims, 9, 10)
 scaled_plan = scaleLHC(plan, [(0, 0.5), (0.2, 0.8), (5, 50), (0, 1),
-	(0, 0.5), (0, 0.5), (0, 0.1), (1, 20), (0, 0.1)])
-scaled_plan[:, 3] = round.(scaled_plan[:, 3])
+    (0, 0.5), (0, 0.5), (0, 0.1), (1, 20), (0, 0.1)])
 ```
 
 The following parameters will remain constant across all simulations:
@@ -64,78 +64,78 @@ I can create interaction matrices for all the simulations using the `prep_intera
 
 ```{julia prep interaction matrices}
 input_df = DataFrame(
-	interaction_strength = scaled_plan[:, 1],
-	cf_ratio = scaled_plan[:, 2],
-	priority_effects = trues(n_sims),
-	strains = scaled_plan[:, 3],
-	proportion_sampled = scaled_plan[:, 4],
-	false_negative = scaled_plan[:, 5],
-	disease_mortality = scaled_plan[:, 6],
-	transmission = scaled_plan[:, 7],
-	latency = scaled_plan[:, 8],
-	recovery = scaled_plan[:, 9],
+    interaction_strength=scaled_plan[:, 1],
+    cf_ratio=scaled_plan[:, 2],
+    priority_effects=trues(n_sims),
+    strains=round.(Int, scaled_plan[:, 3]),
+    proportion_sampled=scaled_plan[:, 4],
+    false_negative=scaled_plan[:, 5],
+    disease_mortality=scaled_plan[:, 6],
+    transmission=scaled_plan[:, 7],
+    latency=scaled_plan[:, 8],
+    recovery=scaled_plan[:, 9],
 )
 CSV.write("Data/simulation_round7_input.csv", input_df)
-matrices = prep_interaction_matrix(input_df)
+matrices = create_interaction_matrix(input_df)
 ```
 
 # Simulation
 
 ```{julia simulate}
 input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
-matrices = prep_interaction_matrix(input_df)
+matrices = create_interaction_matrix(input_df)
 n_individuals = 1000
-
-# Age structure
-ages = ones(Int64, n_individuals)
 
 # Collect detection vectors
 results = zeros(n_sims, 100)
 
 # Simulate
 for i in 1:n_sims
-	n_strains = Int(input_df.strains[i])
-	# Initialize population - everyone starts susceptible
-	initial_pop = [falses(n_strains, 4) for _ in 1:n_individuals]
-	for individual in initial_pop
-		individual[:, 1] .= true  # All individuals start susceptible
-	end
-	disease_mortality = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
-	transmission = rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1), n_strains)
-	latency = round.(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10), n_strains))
-	recovery = rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1), n_strains)
+    # Create SEIR strains
+    n_strains = Int(input_df.strains[i])
+    strains = Vector{SEIRModel}(undef, n_strains)
+    for i in 1:n_strains
+        strains[i] = SEIRModel(
+            rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
+            rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
+            rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1)),
+            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10)))
+        )
+    end
+    # Initialize population - everyone starts susceptible
+    initial_pop = Population(Individual[])
+    for i in 1:n_individuals
+        individual = Individual(n_strains, 1)  # age 1
+        push!(initial_pop.individuals, individual)
+    end
+    # Set simulation parameters
+    params = SimulationParameters(
+        strains,
+        matrices[i],
+        0.0, # base mortality
+        0.0, # fecundity
+        1, # Age of maturity
+        :simultaneous, # introduction of strains
+        100, # time steps
+        :density # transmission type
+    )
 
-	true_pop = coinfection_simulator(
-		initial_pop = initial_pop,
-		ages = ages,
-		interactions = matrices[i],
-		disease_type = fill("seir", n_strains),
-		base_mortality = 0.0,
-		disease_mortality = disease_mortality,
-		fecundity = 0.0,
-		transmission = transmission,
-		time_steps = 100,
-		age_maturity = 1,
-		latency = latency,
-		recovery = recovery,
-		introduction = "simultaneous",
-	)
+    true_pop = simulate(initial_pop, params)
 
-	populations, age_vectors = true_pop
+    sampling_params = SamplingParameters(
+        input_df.proportion_sampled[i],
+        0.0, # false positive
+        input_df.false_negative[i],
+    )
 
-	detections = virtual_ecologist_sample(
-		virtual_population = populations,
-		proportion_sampled = input_df.proportion_sampled[i],
-		false_positive_rate = 0.0,
-		false_negative_rate = input_df.false_negative[i],
-	)
+    detections = sample_populations(true_pop, sampling_params)
 
-	results[i, :] = sum(detections, dims = 2)
+    results[i, :] = sum(detections, dims=2)
 end
 
 CSV.write("Data/simulation_round7_output.csv",
-	Tables.table(results),
-	writeheader = false)
+    Tables.table(results),
+    writeheader=false)
 ```
 
 # Analysis
@@ -145,28 +145,28 @@ To analyze the results, I first need to pair them up with the input parameters t
 ```{julia analysis dataset}
 # Read the data back in
 input_parameters = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
-	@mutate(sim = 1:10000) # simulation IDs
+    @mutate(sim = 1:10000) # simulation IDs
 end
-simulation_output = @chain CSV.read("Data/simulation_round7_output.csv", DataFrame, header = false) begin
-	@mutate(sim = 1:10000) # simulation IDs
-	@pivot_longer(cols = 1:100,
-		names_to = "timestep",
-		values_to = "Detections")
-	transform!(:timestep => ByRow(x -> parse(Int, replace(x, "Column" => ""))) => :timestep)
-	@left_join(input_parameters, sim) # add input parameters
-	@mutate(error_rate = abs(strains - Detections) / strains) # calculate error rate
+simulation_output = @chain CSV.read("Data/simulation_round7_output.csv", DataFrame, header=false) begin
+    @mutate(sim = 1:10000) # simulation IDs
+    @pivot_longer(cols = 1:100,
+        names_to = "timestep",
+        values_to = "Detections")
+    transform!(:timestep => ByRow(x -> parse(Int, replace(x, "Column" => ""))) => :timestep)
+    @left_join(input_parameters, sim) # add input parameters
+    @mutate(error_rate = abs(strains - Detections) / strains) # calculate error rate
 end
 
 for col in names(simulation_output)
-	if eltype(simulation_output[!, col]) >: Missing
-		# Remove Missing from the column type
-		simulation_output[!, col] = identity.(simulation_output[!, col])
-	end
+    if eltype(simulation_output[!, col]) >: Missing
+        # Remove Missing from the column type
+        simulation_output[!, col] = identity.(simulation_output[!, col])
+    end
 end
 
 ggplot(simulation_output) +
-    geom_histogram(aes(x = :error_rate), bins = 50) +
-    scale_y_log10()
+geom_histogram(aes(x=:error_rate), bins=50) +
+scale_y_log10()
 ```
 
 It seems that most of the samples result in no detections, which is to say an error rate of 1. This is likely because a SEIR model with no demography will often result in a disease that burns itself out fairly quickly, so there are no strains to detect after a certain point in the simulations.
@@ -186,7 +186,6 @@ input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priori
 simulation_output <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:10000] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
-    _[timestep < 10,] |>
     merge(x = _, y = input_parameters, by = "sim") |>
     _[, error_rate := abs(strains - Detections) / strains]
 synbias_split <- initial_split(simulation_output[, -c("sim", "Detections")], strata = error_rate)
@@ -200,14 +199,6 @@ tune_spec <- boost_tree(
     # loss_reduction = tune(),
     # sample_size = tune(),
     # mtry = tune(),
-    trees = 1555,
-    min_n = 23,
-    learn_rate = 0.316,
-    tree_depth = 10,
-    loss_reduction = 1.90e-9,
-    sample_size = 1,
-    mtry = 8,
-    stop_iter = 1000
 ) |>
     set_engine("xgboost") |>
     set_mode("regression")
@@ -219,9 +210,19 @@ tune_spec <- boost_tree(
 #         resamples = synbias_folds
 #     )
 # best_tree <- synbias_res |> select_best(metric = "rmse") # trees = 1555, min_n = 23, learn_rate = 0.316, tree_depth = 10, loss_reduction = 1.90e-9, sample_size = 1, mtry = 8
+best_tree <- list(
+    trees = 1555,
+    min_n = 23,
+    learn_rate = 0.316,
+    tree_depth = 10,
+    loss_reduction = 1.90e-9,
+    sample_size = 1,
+    mtry = 8,
+    stop_iter = 1000
+)
 final_wf <- workflow() |>
     add_model(tune_spec) |>
-    add_formula(error_rate ~ cf_ratio*interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+    add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
     finalize_workflow(best_tree)
 final_fit <- final_wf %>%
     last_fit(synbias_split)
@@ -233,14 +234,15 @@ final_fit |>
     vip()
 ```
 
-In the end, a very interesting result. The strong effects of timestep, number of strains, and proportion sampled were expected. It's interesting that latency is the most important epidemiological parameter in terms of the error rate on pathogen richness. Competition to facilitation ratio is more important than either recovery rate or transmission rate in determining the error rate.
+In the end, a very interesting result. The strong effects of timestep, number of strains, false negative rate, and proportion sampled were expected. It's interesting that transmission is the most important epidemiological parameter in terms of the error rate on pathogen richness.
 
 Let's examine this more closely using plots of Shapley values.
 
 ```{r shapley_plots}
 # Create the model matrix using the same formula as workflow
-formula <- error_rate ~ cf_ratio*interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
+formula <- error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
 train_matrix <- synbias_test |>
+    slice_sample(prop = 0.1) |>
     model.matrix(object = formula, data = _) |>
     _[, -1] # remove intercept
 

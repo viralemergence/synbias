@@ -1,0 +1,4 @@
+- source: empirical_analysis.qmd
+  quarto-pub:
+    - id: 9e818594-17a9-47d4-82dd-e2e43936534f
+      url: https://ecomodeling.quarto.pub/analysis-of-community-coinfection-in-empirical-data-1d78

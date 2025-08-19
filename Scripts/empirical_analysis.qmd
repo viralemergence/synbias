@@ -197,7 +197,7 @@ data.frame(
 
 We can see from this plot that negative associations between species (indicating competition within hosts) are much more common than positive associations (indicating facilitation between parasites.) This graph only includes those associations considered to be significant (that is to say, the probability that species co-occur less than expected (or more than expected) is less than 0.05.)
 
-```{r competition:facilitation}
+```{r competition:facilitation, message = F}
 trematode_stats <- snail |>
   pivot_longer(
     cols = starts_with("trematode"),
@@ -238,7 +238,8 @@ df_cf |>
     aes(x = sum_infection_intensity, y = facilitative_pairs),
     color = "#F4B95AFF",
     method = "loess",
-    formula = 'y ~ x'
+    formula = 'y ~ x',
+    se = F
   ) +
   geom_point(
     aes(x = sum_infection_intensity, y = competitive_pairs),
@@ -248,7 +249,8 @@ df_cf |>
     aes(x = sum_infection_intensity, y = competitive_pairs),
     color = "#54BCD1FF",
     method = "loess",
-    formula = 'y ~ x'
+    formula = 'y ~ x',
+    se = F
   ) +
   ggtitle(
     "Infection Intensity as Confounder (blue = competitive, orange = facilitative)"
@@ -266,7 +268,8 @@ df_cf |>
     aes(x = true_species_richness, y = facilitative_pairs),
     color = "#F4B95AFF",
     method = "loess",
-    formula = 'y ~ x'
+    formula = 'y ~ x',
+    se = F
   ) +
   geom_point(
     aes(x = true_species_richness, y = competitive_pairs),
@@ -276,7 +279,8 @@ df_cf |>
     aes(x = true_species_richness, y = competitive_pairs),
     color = "#54BCD1FF",
     method = "loess",
-    formula = 'y ~ x'
+    formula = 'y ~ x',
+    se = F
   ) +
   ggtitle(
     "Species Richness as Confounder (blue = competitive, orange = facilitative)"
@@ -289,23 +293,23 @@ df_cf |>
   ggplot() +
   geom_point(
     aes(x = sample_size, y = facilitative_pairs),
-    color = "#EF7C12FF",
-    se = F,
-    method = 'lm'
+    color = "#EF7C12FF"
   ) +
   geom_smooth(
     aes(x = sample_size, y = facilitative_pairs),
-    color = "#F4B95AFF"
+    color = "#F4B95AFF",
+    method = 'lm',
+    se = F
   ) +
   geom_point(
     aes(x = sample_size, y = competitive_pairs),
-    color = "#007BC3FF",
-    se = F,
-    method = 'lm'
+    color = "#007BC3FF"
   ) +
   geom_smooth(
     aes(x = sample_size, y = competitive_pairs),
-    color = "#54BCD1FF"
+    color = "#54BCD1FF",
+    se = F,
+    method = 'lm'
   ) +
   ggtitle(
     "Sample size as Confounder  (blue = competitive, orange = facilitative)"
@@ -321,7 +325,7 @@ Very importantly, there is variation among sites in how many snails were sampled
 
 I can effectively fill in this graph with more points by randomly subsampling the high sample size sites down to lower sample sizes, and see if the pattern holds.
 
-```{r simulate detectability}
+```{r simulate detectability, message = F}
 library(data.table)
 library(furrr)
 plan(multicore)
@@ -426,11 +430,12 @@ bootstrap_detect |>
 ```
 
 There is pretty much no effect of facilitative or competitive pairs on the bias in species richness estimates. However, there may be some effect of sample size, infection intensity, and true species richness on bias. Later I will use a correlogram to try to get at confounding variables.
-```{r interaction accumulation curve}
+
+```{r interaction accumulation curve, message = F}
 bootstrap_detect |> 
   ggplot(aes(x = downsample_size)) +
-  geom_point(aes(y = facilitative_pairs_estimate), color = "#EF7C12FF", alpha = 0.7) +
-  geom_point(aes(y = competitive_pairs_estimate), color = "#007BC3FF", alpha = 0.7) +
+  geom_jitter(aes(y = facilitative_pairs_estimate), color = "#EF7C12FF", alpha = 0.5) +
+  geom_jitter(aes(y = competitive_pairs_estimate), color = "#007BC3FF", alpha = 0.5) +
   geom_smooth(aes(y = facilitative_pairs_estimate), color = "#F4B95AFF", method = "gam", alpha = 0.7, linewidth = 2) +
   geom_smooth(aes(y = competitive_pairs_estimate), color = "#54BCD1FF", method = "gam", alpha = 0.7, linewidth = 2) +
   geom_point(data = df_cf, aes(x = sample_size, y = facilitative_pairs), color = "#EF7C12FF", size = 4, shape = 18) +
@@ -500,7 +505,7 @@ gp_model |>
       levels = c(
         "Downsample Size",
         "True Species Richness",
-        "Sum Infection Intensity",
+        "Infection Intensity",
         "Facilitative Pairs",
         "Competitive Pairs"
       )
@@ -523,7 +528,7 @@ Sample size and true species richness are significant predictors of bias in spec
 
 Another idea I want to explore is to fit species accumulation curves to the number of competitive and facilitative pairs and use them to calculate how many snails one needs to sample in order to find all of the pairs.
 
-```{r accumulation curves}
+```{r accumulation curves, warning = F}
 library(broom)
 
 # Fit models for facilitative pairs
@@ -631,12 +636,12 @@ pred_data <- data.frame(
 # Plot with fitted curves
 bootstrap_detect %>%
   ggplot(aes(x = downsample_size)) +
-  geom_point(
+  geom_jitter(
     aes(y = facilitative_pairs_estimate),
     color = "#EF7C12FF",
     alpha = 0.5
   ) +
-  geom_point(
+  geom_jitter(
     aes(y = competitive_pairs_estimate),
     color = "#007BC3FF",
     alpha = 0.5

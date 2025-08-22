@@ -52,11 +52,10 @@ The following parameters will remain constant across all simulations:
 1.  Priority effects (all simulations will have priority effects)
 2.  False positive rate (0 across all simulations)
 3.  Initial population size (1000 individuals)
-4.  Disease type (will always be SEIR)
-5.  Baseline host mortality (always 0)
-6.  Host fecundity (always 0)
-7.  Number of time steps (always 100)
-8.  Introduction of strains (always simultaneous at the first timestep)
+4.  Baseline host mortality (always 0)
+5.  Host fecundity (always 0)
+6.  Number of time steps (always 100)
+7.  Introduction of strains (always simultaneous at the first timestep)
 
 ## Prep interaction matrices
 
@@ -81,7 +80,9 @@ matrices = create_interaction_matrix(input_df)
 
 # Simulation
 
-```{julia simulate}
+## SEIR simulations
+
+```{julia simulate_seir}
 input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
 matrices = create_interaction_matrix(input_df)
 n_individuals = 1000
@@ -138,9 +139,66 @@ CSV.write("Data/simulation_round7_output.csv",
     writeheader=false)
 ```
 
+## SI simulations
+
+```{julia simulate_si}
+input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+matrices = create_interaction_matrix(input_df)
+n_individuals = 1000
+
+# Collect detection vectors
+si_results = zeros(n_sims, 100)
+
+# Simulate
+for i in 1:n_sims
+    # Create SI strains
+    n_strains = Int(input_df.strains[i])
+    strains = Vector{SIModel}(undef, n_strains)
+    for i in 1:n_strains
+        strains[i] = SIModel(
+            rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
+            rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1))
+        )
+    end
+    # Initialize population - everyone starts susceptible
+    initial_pop = Population(Individual[])
+    for i in 1:n_individuals
+        individual = Individual(n_strains, 1)  # age 1
+        push!(initial_pop.individuals, individual)
+    end
+    # Set simulation parameters
+    params = SimulationParameters(
+        strains,
+        matrices[i],
+        0.0, # base mortality
+        0.0, # fecundity
+        1, # Age of maturity
+        :simultaneous, # introduction of strains
+        100, # time steps
+        :frequency # transmission type
+    )
+
+    true_pop = simulate(initial_pop, params)
+
+    sampling_params = SamplingParameters(
+        input_df.proportion_sampled[i],
+        0.0, # false positive
+        input_df.false_negative[i],
+    )
+
+    detections = sample_populations(true_pop, sampling_params)
+
+    si_results[i, :] = sum(detections, dims=2)
+end
+
+CSV.write("Data/round7_si_output.csv",
+    Tables.table(si_results),
+    writeheader=false)
+```
+
 # Analysis
 
-To analyze the results, I first need to pair them up with the input parameters that produced them.
+To analyze the results, I first need to pair them up with the input parameters that produced them. Here I examine the SEIR results:
 
 ```{julia analysis dataset}
 # Read the data back in
@@ -170,6 +228,8 @@ scale_y_log10()
 ```
 
 It seems that most of the samples result in no detections, which is to say an error rate of 1. This is likely because a SEIR model with no demography will often result in a disease that burns itself out fairly quickly, so there are no strains to detect after a certain point in the simulations.
+
+Let's see how this looks for the SI simulation results:
 
 Now I will use a machine learning algorithm to find which input parameters affect the error rate the most.
 

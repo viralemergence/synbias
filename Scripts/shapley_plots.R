@@ -14,6 +14,8 @@
 #' grab the values.
 #' @param colors_vec A vector of color values that should be equal in length
 #'  to the number of variables given
+#' @param labels A character vector of labels for the subplots (if NULL,
+#' the column names will be used)
 #' @return Returns a partial dependence plot object that is actually 33
 #' panels (16 panels of partial dependence plots, 16 panels of the density
 #'  curves showing the distribution of values in the training data, panel of
@@ -23,8 +25,10 @@ partial.dependence.plot <- function(
   variables,
   shapley_data,
   train_data,
-  colors_vec
+  colors_vec,
+  labels = NULL
 ) {
+  # Argument checking
   num_variables <- length(variables)
   if (num_variables != length(colors_vec)) {
     stop("The number of variables must match the number of colors provided.")
@@ -47,6 +51,22 @@ partial.dependence.plot <- function(
   if (!all(variables %in% colnames(train_data))) {
     stop("All variables must be present in the train_data.")
   }
+  if (is.null(labels)) {
+    labels <- variables
+  }
+  if (length(labels) != num_variables) {
+    stop("The number of labels must match the number of variables.")
+  }
+  if (!is.character(labels)) {
+    stop("Labels must be a character vector.")
+  }
+
+  # a labeller for later
+  dropLeadingZero <- function(l) {
+    str_replace(l, '0(?=\\.)', '')
+  }
+
+  # Data manipulation
   MNVL <- shapley_data %>%
     filter(!is.na(rfvalue)) %>%
     group_by(variable, ID, rfvalue) %>%
@@ -63,6 +83,8 @@ partial.dependence.plot <- function(
     filter(variable %in% variables) %>%
     group_by(variable) %>%
     summarise(min = min(value), max = max(value))
+
+  # Plotting
   PDP <- lapply(1:num_variables, function(i) {
     PDPR %>%
       filter(variable == variables[i]) %>%
@@ -77,9 +99,9 @@ partial.dependence.plot <- function(
         se = F,
         linewidth = 1.5
       ) +
-      labs(y = NULL, x = variables[i]) +
+      labs(y = NULL, x = labels[i]) +
       theme(
-        aspect.ratio = 1,
+        aspect.ratio = 0.45,
         panel.background = element_rect(fill = "white", color = "grey50"),
         panel.grid.major = element_line(color = "grey90"),
         panel.border = element_rect(fill = "transparent", color = "black"),
@@ -106,14 +128,14 @@ partial.dependence.plot <- function(
       filter(variable == variables[i]) %>%
       ggplot() +
       geom_density(
-        aes(x = rfvalue),
+        aes(x = round(rfvalue, digits = 2)),
         fill = colors_vec[i],
         alpha = 0.4,
         color = colors_vec[i]
       ) +
-      scale_x_continuous(position = "bottom") +
+      scale_x_continuous(position = "bottom", labels = dropLeadingZero) +
       scale_y_reverse(expand = expansion(mult = c(0.1, 0))) +
-      labs(x = variables[i], y = NULL) +
+      labs(x = labels[i], y = NULL) +
       theme(
         panel.background = element_rect(fill = "white", color = "grey50"),
         panel.grid.major = element_line(color = "grey80"),
@@ -122,7 +144,7 @@ partial.dependence.plot <- function(
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         panel.grid.major.y = element_line(color = "transparent"),
-        aspect.ratio = 0.2,
+        aspect.ratio = 0.15,
         plot.margin = margin(0, 0, 0, 0, "pt")
       )
   })

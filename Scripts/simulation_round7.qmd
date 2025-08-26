@@ -337,7 +337,7 @@ library(vip)
 library(future)
 plan(multicore)
 
-input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects")][, sim := 1:10000]
+input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects", "recovery", "latency")][, sim := 1:10000]
 simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:10000] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
@@ -359,8 +359,8 @@ tune_spec_si <- boost_tree(
     set_mode("regression")
 si_folds <- vfold_cv(si_train, 4)
 si_res <- workflow() |>
-    add_model(tune_spec) |>
-    add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+    add_model(tune_spec_si) |>
+    add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission) |>
     tune_grid(
         resamples = si_folds
     )
@@ -607,7 +607,7 @@ for i in 1:n_sims
             push!(timestep_matrices, timestep)
         end
     end
-    
+
     results[i] = timestep_matrices
 end
 
@@ -615,8 +615,8 @@ for (sim_idx, sim_data) in enumerate(results)
     for (timestep_idx, matrix) in enumerate(sim_data)
         int_matrix = Int.(Array(matrix))
         df = DataFrame(int_matrix, :auto)
-        Arrow.write("Data/seir_site_species_matrices/sim_$(sim_idx)_timestep_$(timestep_idx).arrow", 
-                   df)
+        Arrow.write("Data/seir_site_species_matrices/sim_$(sim_idx)_timestep_$(timestep_idx).arrow",
+            df)
     end
 end
 ```
@@ -627,12 +627,40 @@ Now that I have the site/species matrices needed for cooccurrence analysis, I'll
 library(tidyverse)
 library(arrow)
 library(cooccur)
-quiet <- function(x) { 
-  sink(tempfile()) 
-  on.exit(sink()) 
-  invisible(force(x)) 
-} 
+quiet <- function(x) {
+  sink(tempfile())
+  on.exit(sink())
+  invisible(force(x))
+}
 
-test_matrix <- read_feather("Data/seir_site_species_matrices/sim_100_timestep_10.arrow") |> as.matrix()
-test_cooccur <- quiet(cooccur(test_matrix, thresh = T, spp_names = FALSE, prob = "comb"))
+handle_site_species_matrix <- function(file) {
+  m <- read_feather(file) |> as.matrix()
+  tryCatch(
+    {
+      cooccurrence_analysis <- quiet(cooccur(
+        test_matrix,
+        thresh = T,
+        spp_names = FALSE,
+        prob = "comb"
+      ))
+    },
+    error = function(e) {
+      return(NA)
+    }
+  )
+  competitive_pairs <- cooccurrence_analysis$results |>
+    filter(exp_cooccur >= 1, p_lt < 0.05) |>
+    nrow()
+  facilitative_pairs <- cooccurrence_analysis$results |>
+    filter(exp_cooccur >= 1, p_gt < 0.05) |>
+    nrow()
+  return(tibble(
+    file = file,
+    competitive_pairs = competitive_pairs,
+    facilitative_pairs = facilitative_pairs
+  ))
+}
+test_matrix <- handle_site_species_matrix(
+  "Data/seir_site_species_matrices/sim_1_timestep_1.arrow"
+)
 ```

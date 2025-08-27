@@ -20,63 +20,63 @@ library(gpboost)
 knitr::opts_chunk$set(dpi = 300, dev = "png")
 options(list(dplyr.summarise.inform = FALSE, future.rng.onMisuse = "ignore"))
 daphnia <- readxl::read_excel(
-  here("Data/Empirical/Parasite_data.xlsx"),
-  col_types = c(
-    "numeric",
-    "date",
-    "numeric",
-    "skip",
-    "skip",
-    "date",
-    "skip",
-    "skip",
-    "text",
-    "text",
-    "numeric",
-    "skip",
-    "skip",
-    "text",
-    "numeric",
-    "numeric",
-    "numeric",
-    "numeric",
-    "numeric",
-    "numeric",
-    "numeric",
-    "numeric",
-    "text",
-    "numeric",
-    "text",
-    "numeric",
-    "text",
-    "text",
-    "numeric",
-    "text",
-    "numeric",
-    "text",
-    "numeric",
-    "text",
-    "numeric",
-    "text",
-    "text",
-    "text",
-    "text",
-    "skip",
-    "text",
-    "text",
-    "skip",
-    "text",
-    "text",
-    "text",
-    "text"
-  )
+    here("Data/Empirical/Parasite_data.xlsx"),
+    col_types = c(
+        "numeric",
+        "date",
+        "numeric",
+        "skip",
+        "skip",
+        "date",
+        "skip",
+        "skip",
+        "text",
+        "text",
+        "numeric",
+        "skip",
+        "skip",
+        "text",
+        "numeric",
+        "numeric",
+        "numeric",
+        "numeric",
+        "numeric",
+        "numeric",
+        "numeric",
+        "numeric",
+        "text",
+        "numeric",
+        "text",
+        "numeric",
+        "text",
+        "text",
+        "numeric",
+        "text",
+        "numeric",
+        "text",
+        "numeric",
+        "text",
+        "numeric",
+        "text",
+        "text",
+        "text",
+        "text",
+        "skip",
+        "text",
+        "text",
+        "skip",
+        "text",
+        "text",
+        "text",
+        "text"
+    )
 )
 snail <- read_csv(here("Data/Empirical/Trematode Infections.csv"), show_col_types = FALSE)
-quiet <- function(x) { 
-  sink(tempfile()) 
-  on.exit(sink()) 
-  invisible(force(x)) 
-} 
+quiet <- function(x) {
+    sink(tempfile())
+    on.exit(sink())
+    invisible(force(x))
+}
 ```
 
 # Hechinger et al. snail data
@@ -98,225 +98,225 @@ Third, I will test theoretical predictions from our simulation model, namely tha
 ```{r community structure, warning = FALSE, message = FALSE}
 snail <- read_csv(here("Data/Empirical/Trematode Infections.csv"))
 trematodes <- snail |>
-  select(starts_with("trematode")) |>
-  flatten_chr() |>
-  unique() |>
-  discard(
-    .x = _,
-    ~ is.na(.x)
-  ) |>
-  discard(
-    .x = _,
-    ~ str_detect(.x, "\\?")
-  ) |>
-  discard(
-    .x = _,
-    ~ str_detect(.x, "\\*")
-  ) |>
-  discard(
-    .x = _,
-    ~ str_detect(.x, "\\.")
-  ) |>
-  discard(
-    .x = _,
-    ~ str_detect(.x, "^im.+")
-  ) |>
-  discard(.x = _, ~ .x == "u")
+    select(starts_with("trematode")) |>
+    flatten_chr() |>
+    unique() |>
+    discard(
+        .x = _,
+        ~ is.na(.x)
+    ) |>
+    discard(
+        .x = _,
+        ~ str_detect(.x, "\\?")
+    ) |>
+    discard(
+        .x = _,
+        ~ str_detect(.x, "\\*")
+    ) |>
+    discard(
+        .x = _,
+        ~ str_detect(.x, "\\.")
+    ) |>
+    discard(
+        .x = _,
+        ~ str_detect(.x, "^im.+")
+    ) |>
+    discard(.x = _, ~ .x == "u")
 snail_data_prep <- function(df) {
-  all_snails <- df |>
-    rownames_to_column("ID") |>
-    select(ID) |>
-    distinct()
+    all_snails <- df |>
+        rownames_to_column("ID") |>
+        select(ID) |>
+        distinct()
 
-  processed_data <- df |>
-    rownames_to_column("ID") |>
-    pivot_longer(
-      cols = starts_with("trematode"),
-      names_to = "trematode_survey",
-      values_to = "trematode"
-    ) |>
-    filter(trematode %in% trematodes) |>
-    select(ID, trematode) |>
-    distinct() |>
-    mutate(presence = TRUE)
+    processed_data <- df |>
+        rownames_to_column("ID") |>
+        pivot_longer(
+            cols = starts_with("trematode"),
+            names_to = "trematode_survey",
+            values_to = "trematode"
+        ) |>
+        filter(trematode %in% trematodes) |>
+        select(ID, trematode) |>
+        distinct() |>
+        mutate(presence = TRUE)
 
-  all_snails |>
-    cross_join(tibble(trematode = unique(processed_data$trematode))) |>
-    left_join(processed_data, by = c("ID", "trematode")) |>
-    mutate(presence = coalesce(presence, FALSE)) |>
-    pivot_wider(
-      names_from = trematode,
-      values_from = presence,
-      id_cols = ID
-    ) |>
-    column_to_rownames(var = "ID") |>
-    as.matrix() |>
-    t()
+    all_snails |>
+        cross_join(tibble(trematode = unique(processed_data$trematode))) |>
+        left_join(processed_data, by = c("ID", "trematode")) |>
+        mutate(presence = coalesce(presence, FALSE)) |>
+        pivot_wider(
+            names_from = trematode,
+            values_from = presence,
+            id_cols = ID
+        ) |>
+        column_to_rownames(var = "ID") |>
+        as.matrix() |>
+        t()
 }
 cooccurrence_matrices <- snail |>
-  group_by(site) |>
-  group_split() |>
-  map(snail_data_prep)
+    group_by(site) |>
+    group_split() |>
+    map(snail_data_prep)
 cooccurrence_analyses <- cooccurrence_matrices |>
-  map(\(m) quiet(cooccur(m, thresh = F, spp_names = TRUE, prob = "comb")))
+    map(\(m) quiet(cooccur(m, thresh = F, spp_names = TRUE, prob = "comb")))
 competitive_pairs <- cooccurrence_analyses |>
-  map("results") |>
-  map(\(df) {
-    df |>
-      filter(exp_cooccur >= 1, p_lt < 0.05) |>
-      select(sp1_name, sp2_name, obs_cooccur, exp_cooccur, p_lt)
-  })
+    map("results") |>
+    map(\(df) {
+        df |>
+            filter(exp_cooccur >= 1, p_lt < 0.05) |>
+            select(sp1_name, sp2_name, obs_cooccur, exp_cooccur, p_lt)
+    })
 facilitative_pairs <- cooccurrence_analyses |>
-  map("results") |>
-  map(\(df) {
-    df |>
-      filter(exp_cooccur >= 1, p_gt < 0.05) |>
-      select(sp1_name, sp2_name, obs_cooccur, exp_cooccur, p_gt)
-  })
+    map("results") |>
+    map(\(df) {
+        df |>
+            filter(exp_cooccur >= 1, p_gt < 0.05) |>
+            select(sp1_name, sp2_name, obs_cooccur, exp_cooccur, p_gt)
+    })
 data.frame(
-  site = unique(snail$site),
-  facilitative = map_int(facilitative_pairs, nrow),
-  competitive = -map_int(competitive_pairs, nrow)
+    site = unique(snail$site),
+    facilitative = map_int(facilitative_pairs, nrow),
+    competitive = -map_int(competitive_pairs, nrow)
 ) |>
-  ggplot(aes(x = site)) +
-  geom_col(
-    aes(y = facilitative),
-    fill = "#EF7C12FF",
-    alpha = 0.7,
-    width = 0.6
-  ) +
-  geom_col(aes(y = competitive), fill = "#007BC3FF", alpha = 0.7, width = 0.6) +
-  geom_hline(yintercept = 0, color = "black", linewidth = 1) +
-  labs(
-    title = "Facilitative vs Competitive Interactions by Site",
-    x = "Site",
-    y = "Count (Facilitative above, Competitive below)"
-  ) +
-  theme_minimal()
+    ggplot(aes(x = site)) +
+    geom_col(
+        aes(y = facilitative),
+        fill = "#EF7C12FF",
+        alpha = 0.7,
+        width = 0.6
+    ) +
+    geom_col(aes(y = competitive), fill = "#007BC3FF", alpha = 0.7, width = 0.6) +
+    geom_hline(yintercept = 0, color = "black", linewidth = 1) +
+    labs(
+        title = "Facilitative vs Competitive Interactions by Site",
+        x = "Site",
+        y = "Count (Facilitative above, Competitive below)"
+    ) +
+    theme_minimal()
 ```
 
 We can see from this plot that negative associations between species (indicating competition within hosts) are much more common than positive associations (indicating facilitation between parasites.) This graph only includes those associations considered to be significant (that is to say, the probability that species co-occur less than expected (or more than expected) is less than 0.05.)
 
 ```{r competition:facilitation, message = F}
 trematode_stats <- snail |>
-  pivot_longer(
-    cols = starts_with("trematode"),
-    names_to = "trematode_survey",
-    values_to = "trematode"
-  ) |>
-  group_by(`Snail no.`, site) |>
-  reframe(infection_intensity = 1 - str_count(trematode, "^u$")) |>
-  filter(!is.na(infection_intensity)) |>
-  group_by(site) |>
-  summarize(sum_infection_intensity = sum(infection_intensity))
+    pivot_longer(
+        cols = starts_with("trematode"),
+        names_to = "trematode_survey",
+        values_to = "trematode"
+    ) |>
+    group_by(`Snail no.`, site) |>
+    reframe(infection_intensity = 1 - str_count(trematode, "^u$")) |>
+    filter(!is.na(infection_intensity)) |>
+    group_by(site) |>
+    summarize(sum_infection_intensity = sum(infection_intensity))
 df_cf <- snail |>
-  pivot_longer(
-    cols = starts_with("trematode"),
-    names_to = "trematode_survey",
-    values_to = "trematode"
-  ) |>
-  filter(trematode %in% trematodes) |>
-  group_by(site) |>
-  summarize(true_species_richness = n_distinct(trematode)) |>
-  ungroup() |>
-  mutate(
-    facilitative_pairs = map_int(facilitative_pairs, nrow),
-    competitive_pairs = map_int(competitive_pairs, nrow)
-  ) |>
-  left_join(trematode_stats, by = join_by(site))
+    pivot_longer(
+        cols = starts_with("trematode"),
+        names_to = "trematode_survey",
+        values_to = "trematode"
+    ) |>
+    filter(trematode %in% trematodes) |>
+    group_by(site) |>
+    summarize(true_species_richness = n_distinct(trematode)) |>
+    ungroup() |>
+    mutate(
+        facilitative_pairs = map_int(facilitative_pairs, nrow),
+        competitive_pairs = map_int(competitive_pairs, nrow)
+    ) |>
+    left_join(trematode_stats, by = join_by(site))
 df_cf <- snail |>
-  group_by(site) |>
-  summarize(sample_size = n()) |>
-  right_join(df_cf, by = join_by(site))
+    group_by(site) |>
+    summarize(sample_size = n()) |>
+    right_join(df_cf, by = join_by(site))
 df_cf |>
-  ggplot() +
-  geom_point(
-    aes(x = sum_infection_intensity, y = facilitative_pairs),
-    color = "#EF7C12FF"
-  ) +
-  geom_smooth(
-    aes(x = sum_infection_intensity, y = facilitative_pairs),
-    color = "#F4B95AFF",
-    method = "loess",
-    formula = 'y ~ x',
-    se = F
-  ) +
-  geom_point(
-    aes(x = sum_infection_intensity, y = competitive_pairs),
-    color = "#007BC3FF"
-  ) +
-  geom_smooth(
-    aes(x = sum_infection_intensity, y = competitive_pairs),
-    color = "#54BCD1FF",
-    method = "loess",
-    formula = 'y ~ x',
-    se = F
-  ) +
-  ggtitle(
-    "Infection Intensity as Confounder (blue = competitive, orange = facilitative)"
-  ) +
-  ylab("# of Interacting Pairs") +
-  xlab("Infection Intensity")
+    ggplot() +
+    geom_point(
+        aes(x = sum_infection_intensity, y = facilitative_pairs),
+        color = "#EF7C12FF"
+    ) +
+    geom_smooth(
+        aes(x = sum_infection_intensity, y = facilitative_pairs),
+        color = "#F4B95AFF",
+        method = "loess",
+        formula = "y ~ x",
+        se = F
+    ) +
+    geom_point(
+        aes(x = sum_infection_intensity, y = competitive_pairs),
+        color = "#007BC3FF"
+    ) +
+    geom_smooth(
+        aes(x = sum_infection_intensity, y = competitive_pairs),
+        color = "#54BCD1FF",
+        method = "loess",
+        formula = "y ~ x",
+        se = F
+    ) +
+    ggtitle(
+        "Infection Intensity as Confounder (blue = competitive, orange = facilitative)"
+    ) +
+    ylab("# of Interacting Pairs") +
+    xlab("Infection Intensity")
 
 df_cf |>
-  ggplot() +
-  geom_point(
-    aes(x = true_species_richness, y = facilitative_pairs),
-    color = "#EF7C12FF"
-  ) +
-  geom_smooth(
-    aes(x = true_species_richness, y = facilitative_pairs),
-    color = "#F4B95AFF",
-    method = "loess",
-    formula = 'y ~ x',
-    se = F
-  ) +
-  geom_point(
-    aes(x = true_species_richness, y = competitive_pairs),
-    color = "#007BC3FF"
-  ) +
-  geom_smooth(
-    aes(x = true_species_richness, y = competitive_pairs),
-    color = "#54BCD1FF",
-    method = "loess",
-    formula = 'y ~ x',
-    se = F
-  ) +
-  ggtitle(
-    "Species Richness as Confounder (blue = competitive, orange = facilitative)"
-  ) +
-  ylab("# of Interacting Pairs") +
-  xlab("Species Richness")
+    ggplot() +
+    geom_point(
+        aes(x = true_species_richness, y = facilitative_pairs),
+        color = "#EF7C12FF"
+    ) +
+    geom_smooth(
+        aes(x = true_species_richness, y = facilitative_pairs),
+        color = "#F4B95AFF",
+        method = "loess",
+        formula = "y ~ x",
+        se = F
+    ) +
+    geom_point(
+        aes(x = true_species_richness, y = competitive_pairs),
+        color = "#007BC3FF"
+    ) +
+    geom_smooth(
+        aes(x = true_species_richness, y = competitive_pairs),
+        color = "#54BCD1FF",
+        method = "loess",
+        formula = "y ~ x",
+        se = F
+    ) +
+    ggtitle(
+        "Species Richness as Confounder (blue = competitive, orange = facilitative)"
+    ) +
+    ylab("# of Interacting Pairs") +
+    xlab("Species Richness")
 
 
 df_cf |>
-  ggplot() +
-  geom_point(
-    aes(x = sample_size, y = facilitative_pairs),
-    color = "#EF7C12FF"
-  ) +
-  geom_smooth(
-    aes(x = sample_size, y = facilitative_pairs),
-    color = "#F4B95AFF",
-    method = 'lm',
-    se = F
-  ) +
-  geom_point(
-    aes(x = sample_size, y = competitive_pairs),
-    color = "#007BC3FF"
-  ) +
-  geom_smooth(
-    aes(x = sample_size, y = competitive_pairs),
-    color = "#54BCD1FF",
-    se = F,
-    method = 'lm'
-  ) +
-  ggtitle(
-    "Sample size as Confounder  (blue = competitive, orange = facilitative)"
-  ) +
-  ylab("# of Interacting Pairs") +
-  xlab("# of Snails sampled at site")
-    
+    ggplot() +
+    geom_point(
+        aes(x = sample_size, y = facilitative_pairs),
+        color = "#EF7C12FF"
+    ) +
+    geom_smooth(
+        aes(x = sample_size, y = facilitative_pairs),
+        color = "#F4B95AFF",
+        method = "lm",
+        se = F
+    ) +
+    geom_point(
+        aes(x = sample_size, y = competitive_pairs),
+        color = "#007BC3FF"
+    ) +
+    geom_smooth(
+        aes(x = sample_size, y = competitive_pairs),
+        color = "#54BCD1FF",
+        se = F,
+        method = "lm"
+    ) +
+    ggtitle(
+        "Sample size as Confounder  (blue = competitive, orange = facilitative)"
+    ) +
+    ylab("# of Interacting Pairs") +
+    xlab("# of Snails sampled at site")
+
 ```
 
 We can see here that there are variables that are correlated with the number of competitive and facilitative pairs. Species richness of parasites is positively correlated with competitive but not facilitative pairs. Infection intensity is the same.
@@ -339,113 +339,114 @@ sites_to_keep <- c("c2", "c3", "c7", "c8", "f1", "f2", "f3", "f4", "f5")
 
 # --- Helper function for analysis within data.table ---
 analyze_site_dt <- function(site_data) {
-  # 1. Prepare matrix
-  matrix <- snail_data_prep(site_data)
+    # 1. Prepare matrix
+    matrix <- snail_data_prep(site_data)
 
-  # 2. Handle cases where matrix is too small for cooccur
-  if (!is.matrix(matrix) || nrow(matrix) < 2 || ncol(matrix) < 2) {
-    return(list(competitive = 0L, facilitative = 0L))
-  }
+    # 2. Handle cases where matrix is too small for cooccur
+    if (!is.matrix(matrix) || nrow(matrix) < 2 || ncol(matrix) < 2) {
+        return(list(competitive = 0L, facilitative = 0L))
+    }
 
-  # 3. Run cooccur and get results
-  cooccur_res <- quiet(cooccur(
-    matrix,
-    thresh = F,
-    spp_names = TRUE,
-    prob = "comb"
-  ))
-  results_df <- setDT(cooccur_res$results)
+    # 3. Run cooccur and get results
+    cooccur_res <- quiet(cooccur(
+        matrix,
+        thresh = F,
+        spp_names = TRUE,
+        prob = "comb"
+    ))
+    results_df <- setDT(cooccur_res$results)
 
-  # 4. Calculate counts directly from the results
-  if (is.null(results_df)) {
-    return(list(competitive = 0L, facilitative = 0L))
-  }
+    # 4. Calculate counts directly from the results
+    if (is.null(results_df)) {
+        return(list(competitive = 0L, facilitative = 0L))
+    }
 
-  competitive_count <- nrow(results_df[exp_cooccur >= 1 & p_lt < 0.05])
-  facilitative_count <- nrow(results_df[exp_cooccur >= 1 & p_gt < 0.05])
+    competitive_count <- nrow(results_df[exp_cooccur >= 1 & p_lt < 0.05])
+    facilitative_count <- nrow(results_df[exp_cooccur >= 1 & p_gt < 0.05])
 
-  # 5. Return a list of the final counts
-  list(competitive = competitive_count, facilitative = facilitative_count)
+    # 5. Return a list of the final counts
+    list(competitive = competitive_count, facilitative = facilitative_count)
 }
 
 
 bootstrap_detect <- future_map(
-  rep(50:1200, n_sims),
-  function(x) {
-    subsample_dt <- snail[
-      site %in% sites_to_keep,
-      .SD[sample(.N, size = x)],
-      by = site
-    ]
+    rep(50:1200, n_sims),
+    function(x) {
+        subsample_dt <- snail[
+            site %in% sites_to_keep,
+            .SD[sample(.N, size = x)],
+            by = site
+        ]
 
-    pair_counts_dt <- subsample_dt[, analyze_site_dt(.SD), by = site]
-    setnames(
-      pair_counts_dt,
-      c("site", "competitive_pairs_estimate", "facilitative_pairs_estimate")
-    )
+        pair_counts_dt <- subsample_dt[, analyze_site_dt(.SD), by = site]
+        setnames(
+            pair_counts_dt,
+            c("site", "competitive_pairs_estimate", "facilitative_pairs_estimate")
+        )
 
-    melted_subsample <- melt(
-      subsample_dt,
-      id.vars = c("Snail no.", "site"),
-      measure.vars = patterns("^trematode"),
-      value.name = "trematode"
-    )[trematode %in% trematodes]
+        melted_subsample <- melt(
+            subsample_dt,
+            id.vars = c("Snail no.", "site"),
+            measure.vars = patterns("^trematode"),
+            value.name = "trematode"
+        )[trematode %in% trematodes]
 
-    richness_dt <- unique(
-      melted_subsample,
-      by = c("Snail no.", "trematode", "site")
-    )[, .(richness_estimate = .N), by = site]
+        richness_dt <- unique(
+            melted_subsample,
+            by = c("Snail no.", "trematode", "site")
+        )[, .(richness_estimate = .N), by = site]
 
-    results_dt <- df_cf[richness_dt, on = "site"][pair_counts_dt, on = "site"]
-    results_dt[,
-      bias := abs(true_species_richness - richness_estimate) /
-        true_species_richness
-    ]
-    results_dt[, downsample_size := x]
+        results_dt <- df_cf[richness_dt, on = "site"][pair_counts_dt, on = "site"]
+        results_dt[
+            ,
+            bias := abs(true_species_richness - richness_estimate) /
+                true_species_richness
+        ]
+        results_dt[, downsample_size := x]
 
-    return(results_dt)
-  },
-  .progress = TRUE
+        return(results_dt)
+    },
+    .progress = TRUE
 ) |>
-  rbindlist()
+    rbindlist()
 
 bootstrap_detect |>
-  mutate(
-    bias = abs(true_species_richness - richness_estimate) /
-      true_species_richness
-  ) |>
-  tidyplot(x = facilitative_pairs, y = bias) |>
-  add_data_points_beeswarm(color = "#C70E7BFF", alpha = 0.4) |>
-  add_curve_fit(method = "lm", color = "#FC6882FF", linewidth = 3) |>
-  adjust_y_axis_title("Bias in Species Richness Estimate") |>
-  adjust_x_axis_title("Number of Facilitative Pairs")
+    mutate(
+        bias = abs(true_species_richness - richness_estimate) /
+            true_species_richness
+    ) |>
+    tidyplot(x = facilitative_pairs, y = bias) |>
+    add_data_points_beeswarm(color = "#C70E7BFF", alpha = 0.4) |>
+    add_curve_fit(method = "lm", color = "#FC6882FF", linewidth = 3) |>
+    adjust_y_axis_title("Bias in Species Richness Estimate") |>
+    adjust_x_axis_title("Number of Facilitative Pairs")
 bootstrap_detect |>
-  mutate(
-    bias = abs(true_species_richness - richness_estimate) /
-      true_species_richness
-  ) |>
-  tidyplot(x = competitive_pairs, y = bias) |>
-  add_data_points_beeswarm(color = "#C70E7BFF", alpha = 0.4) |>
-  add_curve_fit(method = "lm", color = "#FC6882FF", linewidth = 3)
+    mutate(
+        bias = abs(true_species_richness - richness_estimate) /
+            true_species_richness
+    ) |>
+    tidyplot(x = competitive_pairs, y = bias) |>
+    add_data_points_beeswarm(color = "#C70E7BFF", alpha = 0.4) |>
+    add_curve_fit(method = "lm", color = "#FC6882FF", linewidth = 3)
 ```
 
 There is pretty much no effect of facilitative or competitive pairs on the bias in species richness estimates. However, there may be some effect of sample size, infection intensity, and true species richness on bias. Later I will use a correlogram to try to get at confounding variables.
 
 ```{r interaction accumulation curve, message = F}
-bootstrap_detect |> 
-  ggplot(aes(x = downsample_size)) +
-  geom_jitter(aes(y = facilitative_pairs_estimate), color = "#EF7C12FF", alpha = 0.3) +
-  geom_jitter(aes(y = competitive_pairs_estimate), color = "#007BC3FF", alpha = 0.3) +
-  geom_smooth(aes(y = facilitative_pairs_estimate), color = "#F4B95AFF", method = "gam", alpha = 0.7, linewidth = 2) +
-  geom_smooth(aes(y = competitive_pairs_estimate), color = "#54BCD1FF", method = "gam", alpha = 0.7, linewidth = 2) +
-  geom_point(data = df_cf, aes(x = sample_size, y = facilitative_pairs), color = "#EF7C12FF", size = 4, shape = 18) +
-  geom_point(data = df_cf, aes(x = sample_size, y = competitive_pairs), color = "#007BC3FF", size = 4, shape = 18) +
-  theme_minimal() +
-  labs(
-    title = "Interaction Accumulation Curve (blue = competitive, orange = facilitative)",
-    x = "# of Snails Sampled at Site",
-    y = "Number of Interacting Pairs"
-  )
+bootstrap_detect |>
+    ggplot(aes(x = downsample_size)) +
+    geom_jitter(aes(y = facilitative_pairs_estimate), color = "#EF7C12FF", alpha = 0.3) +
+    geom_jitter(aes(y = competitive_pairs_estimate), color = "#007BC3FF", alpha = 0.3) +
+    geom_smooth(aes(y = facilitative_pairs_estimate), color = "#F4B95AFF", method = "gam", alpha = 0.7, linewidth = 2) +
+    geom_smooth(aes(y = competitive_pairs_estimate), color = "#54BCD1FF", method = "gam", alpha = 0.7, linewidth = 2) +
+    geom_point(data = df_cf, aes(x = sample_size, y = facilitative_pairs), color = "#EF7C12FF", size = 4, shape = 18) +
+    geom_point(data = df_cf, aes(x = sample_size, y = competitive_pairs), color = "#007BC3FF", size = 4, shape = 18) +
+    theme_minimal() +
+    labs(
+        title = "Interaction Accumulation Curve (blue = competitive, orange = facilitative)",
+        x = "# of Snails Sampled at Site",
+        y = "Number of Interacting Pairs"
+    )
 ```
 
 The true field samples are marked here with diamonds, while the simulated samples are marked with points.
@@ -453,18 +454,18 @@ The true field samples are marked here with diamonds, while the simulated sample
 Now this result perfectly fits the theoretical expectation: the number of competitive pairs increases sharply with sample size, while the number of facilitative pairs saturates more quickly. This is because competitive pairs are more likely to be missed at low sample sizes. The accumulation curve has not yet leveled off for competitive pairs, even at 1300 snails sampled, which suggests that there are still more competitive pairs to be found at higher sample sizes.
 
 ```{r correlations}
-bootstrap_detect |> 
-  ungroup() |>
-  mutate(bias = abs(true_species_richness - richness_estimate)/true_species_richness) |> 
-  select(
-    bias,
-    true_species_richness,
-    sum_infection_intensity,
-    downsample_size,
-    facilitative_pairs,
-    competitive_pairs
-  ) |>
-  ggpairs()
+bootstrap_detect |>
+    ungroup() |>
+    mutate(bias = abs(true_species_richness - richness_estimate) / true_species_richness) |>
+    select(
+        bias,
+        true_species_richness,
+        sum_infection_intensity,
+        downsample_size,
+        facilitative_pairs,
+        competitive_pairs
+    ) |>
+    ggpairs()
 ```
 
 Competitive pairs are very strongly correlated with infection intensity, nearly 1:1, while facilitative pairs are more weakly correlated. Controlling for infection intensity will likely remove the effect of competitive pairs on bias, but let's check.
@@ -475,53 +476,53 @@ library(broom.mixed)
 
 bias <- bootstrap_detect$bias
 fixed_effects <- as.matrix(bootstrap_detect |>
-  select(
-    downsample_size,
-    true_species_richness,
-    sum_infection_intensity,
-    facilitative_pairs,
-    competitive_pairs
-  ))
+    select(
+        downsample_size,
+        true_species_richness,
+        sum_infection_intensity,
+        facilitative_pairs,
+        competitive_pairs
+    ))
 random_effects <- as.matrix(bootstrap_detect$site)
 
 gp_model <- fitGPModel(
-  likelihood = "gaussian",
-  group_data = random_effects,
-  y = bias,
-  X = fixed_effects,
-  params = list(std_dev = TRUE)
+    likelihood = "gaussian",
+    group_data = random_effects,
+    y = bias,
+    X = fixed_effects,
+    params = list(std_dev = TRUE)
 )
 
 gp_model |>
-  get_coef() |>
-  t() |>
-  as.data.frame() |> 
-  rownames_to_column("term") |>
-  mutate(term = str_replace_all(term, "_", " ")) |>
-  mutate(term = str_to_title(term)) |>
-  mutate(
-    term = factor(
-      term,
-      levels = c(
-        "Downsample Size",
-        "True Species Richness",
-        "Sum Infection Intensity",
-        "Facilitative Pairs",
-        "Competitive Pairs"
-      )
-    ),
-    upper = `Param.` + `Std. dev.`,
-    lower = `Param.` - `Std. dev.`
-  ) |>
-  ggplot(aes(x = term, y = `Param.`)) +
-  geom_col(fill = "#FC6882FF") +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  labs(
-    title = "Fixed Effects on Species Estimate Bias",
-    x = "Term",
-    y = "Estimate"
-  ) +
-  theme_minimal()
+    get_coef() |>
+    t() |>
+    as.data.frame() |>
+    rownames_to_column("term") |>
+    mutate(term = str_replace_all(term, "_", " ")) |>
+    mutate(term = str_to_title(term)) |>
+    mutate(
+        term = factor(
+            term,
+            levels = c(
+                "Downsample Size",
+                "True Species Richness",
+                "Sum Infection Intensity",
+                "Facilitative Pairs",
+                "Competitive Pairs"
+            )
+        ),
+        upper = `Param.` + `Std. dev.`,
+        lower = `Param.` - `Std. dev.`
+    ) |>
+    ggplot(aes(x = term, y = `Param.`)) +
+    geom_col(fill = "#FC6882FF") +
+    geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+    labs(
+        title = "Fixed Effects on Species Estimate Bias",
+        x = "Term",
+        y = "Estimate"
+    ) +
+    theme_minimal()
 ```
 
 Sample size and true species richness are significant predictors of bias in species richness estimates (there is more bias at low sample size and high species richness). Competition and facilatition are too confounded with infection intensity to have any effect, it seems.
@@ -533,43 +534,43 @@ library(broom)
 
 # Fit models for facilitative pairs
 facilitative_data <- bootstrap_detect %>%
-  select(downsample_size, facilitative_pairs_estimate) %>%
-  na.omit()
+    select(downsample_size, facilitative_pairs_estimate) %>%
+    na.omit()
 
 # Try different approaches for negative exponential fitting
 fit_negexp_safe <- function(data, y_col) {
-  tryCatch(
-    {
-      # Better starting values
-      max_y <- max(data[[y_col]])
-      # Use a simple exponential approach: y = a * (1 - exp(-b * x))
-      nls(
-        as.formula(paste(y_col, "~ a * (1 - exp(-b * downsample_size))")),
-        data = data,
-        start = list(a = max_y * 1.2, b = 0.01),
-        control = nls.control(maxiter = 100, warnOnly = TRUE)
-      )
-    },
-    error = function(e) {
-      # If that fails, try Michaelis-Menten: y = (a * x) / (b + x)
-      tryCatch(
+    tryCatch(
         {
-          nls(
-            as.formula(paste(
-              y_col,
-              "~ (a * downsample_size) / (b + downsample_size)"
-            )),
-            data = data,
-            start = list(
-              a = max(data[[y_col]]) * 2,
-              b = median(data$downsample_size)
+            # Better starting values
+            max_y <- max(data[[y_col]])
+            # Use a simple exponential approach: y = a * (1 - exp(-b * x))
+            nls(
+                as.formula(paste(y_col, "~ a * (1 - exp(-b * downsample_size))")),
+                data = data,
+                start = list(a = max_y * 1.2, b = 0.01),
+                control = nls.control(maxiter = 100, warnOnly = TRUE)
             )
-          )
         },
-        error = function(e2) NULL
-      )
-    }
-  )
+        error = function(e) {
+            # If that fails, try Michaelis-Menten: y = (a * x) / (b + x)
+            tryCatch(
+                {
+                    nls(
+                        as.formula(paste(
+                            y_col,
+                            "~ (a * downsample_size) / (b + downsample_size)"
+                        )),
+                        data = data,
+                        start = list(
+                            a = max(data[[y_col]]) * 2,
+                            b = median(data$downsample_size)
+                        )
+                    )
+                },
+                error = function(e2) NULL
+            )
+        }
+    )
 }
 
 # Fit models
@@ -577,157 +578,156 @@ fac_negexp <- fit_negexp_safe(facilitative_data, "facilitative_pairs_estimate")
 
 # Logarithmic: y = a * log(x + 1) + b
 fac_log <- nls(
-  facilitative_pairs_estimate ~ a * log(downsample_size + 1) + b,
-  data = facilitative_data,
-  start = list(a = 1, b = 0)
+    facilitative_pairs_estimate ~ a * log(downsample_size + 1) + b,
+    data = facilitative_data,
+    start = list(a = 1, b = 0)
 )
 
 # Fit models for competitive pairs
 competitive_data <- bootstrap_detect %>%
-  select(downsample_size, competitive_pairs_estimate) %>%
-  na.omit()
+    select(downsample_size, competitive_pairs_estimate) %>%
+    na.omit()
 
 # Negative exponential
 comp_negexp <- fit_negexp_safe(competitive_data, "competitive_pairs_estimate")
 
 # Logarithmic
 comp_log <- nls(
-  competitive_pairs_estimate ~ a * log(downsample_size + 1) + b,
-  data = competitive_data,
-  start = list(a = 1, b = 0)
+    competitive_pairs_estimate ~ a * log(downsample_size + 1) + b,
+    data = competitive_data,
+    start = list(a = 1, b = 0)
 )
 
 # Create prediction data
 pred_x <- seq(
-  1,
-  max(bootstrap_detect$downsample_size, na.rm = TRUE),
-  length.out = 100
+    1,
+    max(bootstrap_detect$downsample_size, na.rm = TRUE),
+    length.out = 100
 )
 
 # Generate predictions
 fac_negexp_pred <- predict(
-  fac_negexp,
-  newdata = data.frame(downsample_size = pred_x)
+    fac_negexp,
+    newdata = data.frame(downsample_size = pred_x)
 )
 fac_log_pred <- predict(fac_log, newdata = data.frame(downsample_size = pred_x))
 comp_negexp_pred <- predict(
-  comp_negexp,
-  newdata = data.frame(downsample_size = pred_x)
+    comp_negexp,
+    newdata = data.frame(downsample_size = pred_x)
 )
 comp_log_pred <- predict(
-  comp_log,
-  newdata = data.frame(downsample_size = pred_x)
+    comp_log,
+    newdata = data.frame(downsample_size = pred_x)
 )
 
 # Create prediction dataframe
 pred_data <- data.frame(
-  downsample_size = rep(pred_x, 4),
-  predicted = c(fac_negexp_pred, fac_log_pred, comp_negexp_pred, comp_log_pred),
-  interaction_type = rep(
-    c("facilitative", "facilitative", "competitive", "competitive"),
-    each = 100
-  ),
-  model_type = rep(
-    c("neg_exp", "logarithmic", "neg_exp", "logarithmic"),
-    each = 100
-  )
+    downsample_size = rep(pred_x, 4),
+    predicted = c(fac_negexp_pred, fac_log_pred, comp_negexp_pred, comp_log_pred),
+    interaction_type = rep(
+        c("facilitative", "facilitative", "competitive", "competitive"),
+        each = 100
+    ),
+    model_type = rep(
+        c("neg_exp", "logarithmic", "neg_exp", "logarithmic"),
+        each = 100
+    )
 )
 
 # Plot with fitted curves
 bootstrap_detect %>%
-  ggplot(aes(x = downsample_size)) +
-  geom_jitter(
-    aes(y = facilitative_pairs_estimate),
-    color = "#EF7C12FF",
-    alpha = 0.3
-  ) +
-  geom_jitter(
-    aes(y = competitive_pairs_estimate),
-    color = "#007BC3FF",
-    alpha = 0.3
-  ) +
-  geom_smooth(
-    aes(y = facilitative_pairs_estimate),
-    color = "#F4B95AFF",
-    method = "gam",
-    alpha = 0.7,
-    size = 2
-  ) +
-  geom_smooth(
-    aes(y = competitive_pairs_estimate),
-    color = "#54BCD1FF",
-    method = "gam",
-    alpha = 0.7,
-    size = 2
-  ) +
-  # Add fitted curves
-  geom_line(
-    data = filter(
-      pred_data,
-      interaction_type == "facilitative",
-      model_type == "neg_exp"
-    ),
-    aes(y = predicted),
-    color = "#F4B95AFF",
-    linetype = "dashed",
-    size = 2
-  ) +
-  geom_line(
-    data = filter(
-      pred_data,
-      interaction_type == "facilitative",
-      model_type == "logarithmic"
-    ),
-    aes(y = predicted),
-    color = "#F4B95AFF",
-    linetype = "dotted",
-    size = 2
-  ) +
-  geom_line(
-    data = filter(
-      pred_data,
-      interaction_type == "competitive",
-      model_type == "neg_exp"
-    ),
-    aes(y = predicted),
-    color = "#54BCD1FF",
-    linetype = "dashed",
-    size = 2.5
-  ) +
-  geom_line(
-    data = filter(
-      pred_data,
-      interaction_type == "competitive",
-      model_type == "logarithmic"
-    ),
-    aes(y = predicted),
-    color = "#54BCD1FF",
-    linetype = "dotted",
-    size = 2.5
-  ) +
-
-  geom_point(
-    data = df_cf,
-    aes(x = sample_size, y = facilitative_pairs),
-    color = "#EF7C12FF",
-    size = 4,
-    shape = 18
-  ) +
-  geom_point(
-    data = df_cf,
-    aes(x = sample_size, y = competitive_pairs),
-    color = "#007BC3FF",
-    size = 4,
-    shape = 18
-  ) +
-  theme_minimal() +
-  scale_y_continuous(limits = c(0, NA)) +
-  labs(
-    title = "Interaction Accumulation Curves with Fitted Models",
-    subtitle = "Dashed = Negative Exponential, Dotted = Logarithmic, Solid = Fitted GAM",
-    x = "# of Snails Sampled at Site",
-    y = "Number of Interacting Pairs"
-  )
+    ggplot(aes(x = downsample_size)) +
+    geom_jitter(
+        aes(y = facilitative_pairs_estimate),
+        color = "#EF7C12FF",
+        alpha = 0.3
+    ) +
+    geom_jitter(
+        aes(y = competitive_pairs_estimate),
+        color = "#007BC3FF",
+        alpha = 0.3
+    ) +
+    geom_smooth(
+        aes(y = facilitative_pairs_estimate),
+        color = "#F4B95AFF",
+        method = "gam",
+        alpha = 0.7,
+        size = 2
+    ) +
+    geom_smooth(
+        aes(y = competitive_pairs_estimate),
+        color = "#54BCD1FF",
+        method = "gam",
+        alpha = 0.7,
+        size = 2
+    ) +
+    # Add fitted curves
+    geom_line(
+        data = filter(
+            pred_data,
+            interaction_type == "facilitative",
+            model_type == "neg_exp"
+        ),
+        aes(y = predicted),
+        color = "#F4B95AFF",
+        linetype = "dashed",
+        size = 2
+    ) +
+    geom_line(
+        data = filter(
+            pred_data,
+            interaction_type == "facilitative",
+            model_type == "logarithmic"
+        ),
+        aes(y = predicted),
+        color = "#F4B95AFF",
+        linetype = "dotted",
+        size = 2
+    ) +
+    geom_line(
+        data = filter(
+            pred_data,
+            interaction_type == "competitive",
+            model_type == "neg_exp"
+        ),
+        aes(y = predicted),
+        color = "#54BCD1FF",
+        linetype = "dashed",
+        size = 2.5
+    ) +
+    geom_line(
+        data = filter(
+            pred_data,
+            interaction_type == "competitive",
+            model_type == "logarithmic"
+        ),
+        aes(y = predicted),
+        color = "#54BCD1FF",
+        linetype = "dotted",
+        size = 2.5
+    ) +
+    geom_point(
+        data = df_cf,
+        aes(x = sample_size, y = facilitative_pairs),
+        color = "#EF7C12FF",
+        size = 4,
+        shape = 18
+    ) +
+    geom_point(
+        data = df_cf,
+        aes(x = sample_size, y = competitive_pairs),
+        color = "#007BC3FF",
+        size = 4,
+        shape = 18
+    ) +
+    theme_minimal() +
+    scale_y_continuous(limits = c(0, NA)) +
+    labs(
+        title = "Interaction Accumulation Curves with Fitted Models",
+        subtitle = "Dashed = Negative Exponential, Dotted = Logarithmic, Solid = Fitted GAM",
+        x = "# of Snails Sampled at Site",
+        y = "Number of Interacting Pairs"
+    )
 ```
 
 The logarithmic and negative exponential models fit the observed trends in facilatitive pairs well, but the competitive pairs don't fit the models at all. This is likely because competitive pairs are still accumulating rapidly at the highest sample sizes, while facilitative pairs have already saturated.
@@ -737,11 +737,11 @@ The logarithmic and negative exponential models fit the observed trends in facil
 What are these competing pairs, anyway? Let's return to the field data and pull out the pairs that are consistently competitive or facilitative across sites.
 
 ```{r facilitative pairs}
-facilitative_pairs |> 
-  map(\(df) select(df, sp1_name, sp2_name)) |>
-  bind_rows() |> 
-  group_by(sp1_name, sp2_name) |>
-  summarize(n = n())
+facilitative_pairs |>
+    map(\(df) select(df, sp1_name, sp2_name)) |>
+    bind_rows() |>
+    group_by(sp1_name, sp2_name) |>
+    summarize(n = n())
 ```
 
 Most of the time, the facilatitive pair is *Euhaplorchis californiensis* and small cyathocotylid trematodes (7/10 pairs). There are also 2 instances of *E. californiensis* and *Renicola buchanani* being facilitative, and one instance of *E. californiensis* and *Austrobilharzia* sp. being facilitative.
@@ -749,12 +749,12 @@ Most of the time, the facilatitive pair is *Euhaplorchis californiensis* and sma
 Now let's look at the competitive pairs, which should be well-established from lab experiments, though many of them only occur once across sites.
 
 ```{r competitive pairs}
-competitive_pairs |> 
-  map(\(df) select(df, sp1_name, sp2_name)) |>
-  bind_rows() |> 
-  group_by(sp1_name, sp2_name) |>
-  summarize(n = n()) |> 
-  print(n = 41)
+competitive_pairs |>
+    map(\(df) select(df, sp1_name, sp2_name)) |>
+    bind_rows() |>
+    group_by(sp1_name, sp2_name) |>
+    summarize(n = n()) |>
+    print(n = 41)
 ```
 
 # Tara's *Daphnia* data
@@ -771,55 +771,55 @@ The difference in approach here is that I have to control for time. While the sn
 
 ```{r daphnia cooccurrence, output = FALSE, warning = FALSE}
 daphnia_data_prep <- function(df) {
-  df |>
-    pivot_longer(
-      cols = contains("status"),
-      names_to = "Parasite",
-      values_to = "presence"
-    ) |>
-    select(id = `data order`, Parasite, presence) |>
-    distinct() |>
-    mutate(
-      presence = presence == "u",
-      Parasite = str_split_i(Parasite, " ", 1)
-    ) |>
-    pivot_wider(
-      names_from = Parasite, # The species names become columns
-      values_from = presence, # TRUE/FALSE based on presence
-      values_fill = FALSE, # Fill absent species with FALSE
-      id_cols = id,
-      id_expand = TRUE
-    ) |>
-    column_to_rownames(var = "id") |>
-    as.matrix() |>
-    t()
+    df |>
+        pivot_longer(
+            cols = contains("status"),
+            names_to = "Parasite",
+            values_to = "presence"
+        ) |>
+        select(id = `data order`, Parasite, presence) |>
+        distinct() |>
+        mutate(
+            presence = presence == "u",
+            Parasite = str_split_i(Parasite, " ", 1)
+        ) |>
+        pivot_wider(
+            names_from = Parasite, # The species names become columns
+            values_from = presence, # TRUE/FALSE based on presence
+            values_fill = FALSE, # Fill absent species with FALSE
+            id_cols = id,
+            id_expand = TRUE
+        ) |>
+        column_to_rownames(var = "id") |>
+        as.matrix() |>
+        t()
 }
 cooccurrence_matrices <- daphnia |>
-  group_by(lake, `date collected`) |>
-  group_split() |>
-  map(daphnia_data_prep)
+    group_by(lake, `date collected`) |>
+    group_split() |>
+    map(daphnia_data_prep)
 cooccurrence_analyses <- cooccurrence_matrices |>
-  map(\(m) quiet(cooccur(m, thresh = T, spp_names = TRUE, prob = "comb")))
+    map(\(m) quiet(cooccur(m, thresh = T, spp_names = TRUE, prob = "comb")))
 ```
 
 ```{r plot daphnia associations}
-daphnia |> 
-  group_by(lake, `date collected`) |> 
-  group_keys() |> 
-  mutate(
-    positive = map_int(cooccurrence_analyses, "positive"),
-    negative = map_int(cooccurrence_analyses, "negative")
-  ) |> 
-    pivot_longer(
-      cols = c(positive, negative),
-      names_to = "association",
-      values_to = "count"
+daphnia |>
+    group_by(lake, `date collected`) |>
+    group_keys() |>
+    mutate(
+        positive = map_int(cooccurrence_analyses, "positive"),
+        negative = map_int(cooccurrence_analyses, "negative")
     ) |>
-  ggplot() +
-  geom_histogram(aes(x = count, fill = association), bins = 2, position = "dodge") +
-  xlab("Number of Associations per Site/Month") +
-  ggtitle("Species Associations (blue = positive, orange = negative)") +
-  theme_bw()
+    pivot_longer(
+        cols = c(positive, negative),
+        names_to = "association",
+        values_to = "count"
+    ) |>
+    ggplot() +
+    geom_histogram(aes(x = count, fill = association), bins = 2, position = "dodge") +
+    xlab("Number of Associations per Site/Month") +
+    ggtitle("Species Associations (blue = positive, orange = negative)") +
+    theme_bw()
 ```
 
 This result is very different from the snail/trematode system. The associations are much more likely to be neutral, and there doesn't seem to be any salient difference in positive vs. negative associations.
@@ -829,16 +829,16 @@ This result is very different from the snail/trematode system. The associations 
 Again, I want to look at the specific species pairs involved here and get a sense of whether the (few) species pairs with positive or negative interactions are consistent in space and time.
 
 ```{r daphnia consistency}
-facilitative_pairs_daphnia <- cooccurrence_analyses |> 
-  map("results") |> 
-  map(\(df) df |> filter(p_gt < 0.05)) |>
-  map(\(df) select(df, sp1_name, sp2_name)) |> 
-  bind_rows()
+facilitative_pairs_daphnia <- cooccurrence_analyses |>
+    map("results") |>
+    map(\(df) df |> filter(p_gt < 0.05)) |>
+    map(\(df) select(df, sp1_name, sp2_name)) |>
+    bind_rows()
 competitive_pairs_daphnia <- cooccurrence_analyses |>
-  map("results") |> 
-  map(\(df) df |> filter(p_lt < 0.05)) |>
-  map(\(df) select(df, sp1_name, sp2_name)) |> 
-  bind_rows()
+    map("results") |>
+    map(\(df) df |> filter(p_lt < 0.05)) |>
+    map(\(df) select(df, sp1_name, sp2_name)) |>
+    bind_rows()
 facilitative_pairs_daphnia
 competitive_pairs_daphnia
 ```
@@ -846,14 +846,14 @@ competitive_pairs_daphnia
 These results indicate that there are very few species pairs that are competitive or facilitative across sites and times (two competitive pairs and three facilitative pairs). This seems to be because the sample sizes are much lower:
 
 ```{r daphnia sample sizes}
-daphnia |> 
-  group_by(lake, `date collected`) |> 
-  summarize(sample_size = n()) |>
-  ggplot(aes(x = sample_size)) +
-  geom_histogram(bins = 20) +
-  xlab("Sample Size") +
-  ylab("Count") +
-  ggtitle("Sample Sizes in Daphnia Data")
+daphnia |>
+    group_by(lake, `date collected`) |>
+    summarize(sample_size = n()) |>
+    ggplot(aes(x = sample_size)) +
+    geom_histogram(bins = 20) +
+    xlab("Sample Size") +
+    ylab("Count") +
+    ggtitle("Sample Sizes in Daphnia Data")
 ```
 
 These kinds of sample sizes in the snail dataset were insufficient to detect more than a couple of pairs. Of course, this loss of sample size is due to the fact that I had to group the data by time as well as place, due to the ephemeral nature of *Daphnia*.

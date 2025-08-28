@@ -87,19 +87,6 @@ matrices = create_interaction_matrix(input_df)
 ```{julia simulate_seir}
 input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
 matrices = create_interaction_matrix(input_df)
-total_competition = Vector{Float64}()
-total_facilitation = Vector{Float64}()
-for m in matrices
-    m0 = m .- 1
-    negative_indices = m0 .< 0
-    positive_indices = m0 .> 0
-    c = sum(m0[negative_indices])
-    f = sum(m0[positive_indices])
-    push!(total_competition, c)
-    push!(total_facilitation, f)
-end
-interaction_scores = DataFrame(sim=1:10000, total_competition=abs.(total_competition), total_facilitation=total_facilitation)
-CSV.write("Data/interaction_scores.csv", interaction_scores)
 n_individuals = 1000
 
 # Collect detection vectors
@@ -115,7 +102,7 @@ for i in 1:n_sims
             rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1)),
-            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10))),
+            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10)))
         )
     end
     # Initialize population - everyone starts susceptible
@@ -133,7 +120,7 @@ for i in 1:n_sims
         1, # Age of maturity
         :simultaneous, # introduction of strains
         100, # time steps
-        :density, # transmission type
+        :density # transmission type
     )
 
     true_pop = simulate(initial_pop, params)
@@ -172,7 +159,7 @@ for i in 1:n_sims
     for i in 1:n_strains
         strains[i] = SIModel(
             rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
-            rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
+            rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1))
         )
     end
     # Initialize population - everyone starts susceptible
@@ -190,7 +177,7 @@ for i in 1:n_sims
         1, # Age of maturity
         :simultaneous, # introduction of strains
         100, # time steps
-        :frequency, # transmission type
+        :frequency # transmission type
     )
 
     true_pop = simulate(initial_pop, params)
@@ -238,8 +225,8 @@ for col in names(simulation_output_seir)
 end
 
 ggplot(simulation_output_seir) +
-geom_histogram(aes(x=:error_rate), bins=50) +
-scale_y_log10()
+    geom_histogram(aes(x=:error_rate), bins=50) +
+    scale_y_log10()
 ```
 
 This is like a negative exponential distribution of error rates for the density-dependent SEIR simulations.
@@ -268,8 +255,8 @@ for col in names(simulation_output_si)
 end
 
 ggplot(simulation_output_si) +
-geom_histogram(aes(x=:error_rate), bins=50) +
-scale_y_log10()
+    geom_histogram(aes(x=:error_rate), bins=50) +
+    scale_y_log10()
 ```
 
 It seems that most of the samples result in no detections, which is to say an error rate of 1. I believe that this is due to the frequency-dependent nature of this simulation, based on my experimentation with different simulation settings.
@@ -287,18 +274,13 @@ library(vip)
 library(future)
 plan(multicore)
 
-interaction_scores <- fread(here("Data/interaction_scores.csv"))
 input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects")][, sim := 1:10000]
 simulation_output_seir <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:10000] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
-    merge(x = _, y = interaction_scores, by = "sim") |>
-    _[, error_rate := abs(strains - Detections) / strains] |>
-	_[, competition_score := total_competition / strains] |>
-	_[, facilitation_score := total_facilitation / strains] |>
-	_[, c("total_competition", "total_facilitation") := NULL]
-synbias_split <- initial_split(simulation_output_seir[, -c("sim", "Detections", "cf_ratio", "interaction_strength")], strata = error_rate)
+    _[, error_rate := abs(strains - Detections) / strains]
+synbias_split <- initial_split(simulation_output_seir[, -c("sim", "Detections")], strata = error_rate)
 synbias_train <- training(synbias_split)
 synbias_test <- testing(synbias_split)
 tune_spec_seir <- boost_tree(
@@ -315,7 +297,7 @@ tune_spec_seir <- boost_tree(
 # synbias_folds <- vfold_cv(synbias_train, 4)
 # synbias_res <- workflow() |>
 #     add_model(tune_spec) |>
-#     add_formula(error_rate ~ competition_score + facilitation_score + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+#     add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
 #     tune_grid(
 #         resamples = synbias_folds
 #     )
@@ -332,7 +314,7 @@ best_tree_seir <- list(
 )
 final_wf_seir <- workflow() |>
     add_model(tune_spec_seir) |>
-    add_formula(error_rate ~ competition_score + facilitation_score + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+    add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
     finalize_workflow(best_tree_seir)
 final_fit_seir <- final_wf_seir %>%
     last_fit(synbias_split)
@@ -344,7 +326,7 @@ final_fit_seir |>
     vip()
 ```
 
-In the end, a very interesting result. The strong effects of timestep, number of strains, false negative rate, and proportion sampled were expected. It's interesting just how important the competition and facilitation scores are, more so than any of the epidemiological parameters.
+In the end, a very interesting result. The strong effects of timestep, number of strains, false negative rate, and proportion sampled were expected. It's interesting that C:F ratio is more important to the error rate than transmission or recovery.
 
 ```{r sensitivity_analysis_si}
 library(data.table)
@@ -355,110 +337,63 @@ library(vip)
 library(future)
 plan(multicore)
 
-interaction_scores <- fread(here("Data/interaction_scores.csv"))
 input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects", "recovery", "latency")][, sim := 1:10000]
 simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:10000] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
-    merge(x = _, y = interaction_scores, by = "sim") |>
-    _[, error_rate := abs(strains - Detections) / strains] |>
-	_[, competition_score := total_competition / strains] |>
-	_[, facilitation_score := total_facilitation / strains] |>
-	_[, c("total_competition", "total_facilitation") := NULL]
+    _[, error_rate := abs(strains - Detections) / strains]
 si_split <- initial_split(simulation_output_si[, -c("sim", "Detections")], strata = error_rate)
 si_train <- training(si_split)
 si_test <- testing(si_split)
 tune_spec_si <- boost_tree(
-    trees = 1555,
-    min_n = 23,
+    trees = tune(),
+    min_n = tune(),
     learn_rate = tune(),
-    tree_depth = 10,
-    loss_reduction = 1.90e-9,
-    sample_size = 1,
-    mtry = 8,
-    stop_iter = tune()
+    tree_depth = tune(),
+    loss_reduction = tune(),
+    sample_size = tune(),
+    mtry = tune()
 ) |>
     set_engine("xgboost") |>
     set_mode("regression")
 si_folds <- vfold_cv(si_train, 4)
 si_res <- workflow() |>
     add_model(tune_spec_si) |>
-    add_formula(error_rate ~ competition_score + facilitation_score + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission) |>
+    add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission) |>
     tune_grid(
         resamples = si_folds,
-        grid = 50
+        control = control_grid(verbose = T)
     )
 best_tree_si <- si_res |> select_best(metric = "rmse")
 ```
 
 Let's examine these results more closely using plots of Shapley values.
 
-```{r shapley_plots_seir}
+```{r shapley_plots}
 # Create the model matrix using the same formula as workflow
-formula_seir <- error_rate ~
-  competition_score +
-    facilitation_score +
-    timestep +
-    strains +
-    proportion_sampled +
-    false_negative +
-    disease_mortality +
-    transmission +
-    latency +
-    recovery
-train_matrix_seir <- synbias_test |>
-  slice_sample(prop = 0.1) |>
-  model.matrix(object = formula_seir, data = _) |>
-  _[, -1] # remove intercept
-var_names <- c(
-  "Competition Score",
-  "Facilitation Score",
-  "Timestep",
-  "Strains",
-  "Prop. Sampled",
-  "False Negative",
-  "Disease Mortality",
-  "Transmission",
-  "Latency",
-  "Recovery"
-)
+formula_seir <- error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
+train_matrix_seir <- si_test |>
+    slice_sample(prop = 0.1) |>
+    model.matrix(object = formula, data = _) |>
+    _[, -1] # remove intercept
+var_names <- c("C:F Ratio", "Interaction Strength", "Timestep", "Strains", "Prop. Sampled", "False Negative", "Disease Mortality", "Transmission", "Latency", "Recovery", "CF Ratio x Strength")
 
 # Extract the xgboost model
 xgb_model_seir <- final_fit_seir %>%
-  extract_workflow() %>%
-  extract_fit_parsnip() %>%
-  .$fit
+    extract_workflow() %>%
+    extract_fit_parsnip() %>%
+    .$fit
 
 # Compute SHAP values
 library(SHAPforxgboost)
 shapley_data_seir <- shap.values(xgb_model_seir, as.matrix(train_matrix_seir))
-shap_long_seir <- shap.prep(
-  shap_contrib = shapley_data_seir$shap_score,
-  X_train = train_matrix_seir
-)
+shap_long_seir <- shap.prep(shap_contrib = shapley_data_seir$shap_score, X_train = train_matrix_seir)
 shap.plot.summary(shap_long_seir)
 
 source(here("Scripts/shapley_plots.R"))
 library(patchwork)
-partial.dependence.plot(
-  colnames(train_matrix_seir),
-  shap_long_seir,
-  as.data.frame(train_matrix_seir),
-  c(
-    "#4F6980FF",
-    "#849DB1FF",
-    "#A2CEAAFF",
-    "#638B66FF",
-    "#BFBB60FF",
-    "#F47942FF",
-    "#FBB04EFF",
-    "#B66353FF",
-    "#D7CE9FFF",
-    "#B9AA97FF"
-  ),
-  var_names
-)
+partial.dependence.plot(colnames(train_matrix_seir), shap_long_seir, as.data.frame(train_matrix_seir), c("#4F6980FF", "#849DB1FF", "#A2CEAAFF", "#638B66FF", "#BFBB60FF", "#F47942FF", "#FBB04EFF", "#B66353FF", "#D7CE9FFF", "#B9AA97FF", "#7E756DFF"), var_names)
 ```
 
 # Accumulation Curves
@@ -485,7 +420,7 @@ for i in 1:n_sims
             rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1)),
-            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10))),
+            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10)))
         )
     end
     # Initialize population - everyone starts susceptible
@@ -503,7 +438,7 @@ for i in 1:n_sims
         1, # Age of maturity
         :simultaneous, # introduction of strains
         100, # time steps
-        :density, # transmission type
+        :density # transmission type
     )
 
     true_pop = simulate(initial_pop, params)
@@ -518,37 +453,40 @@ for i in 1:n_sims
 
     detection_by_strain = sum(detections, dims=1) .> 1
 
-    cumulative_detections[i] = sum(detection_by_strain) / n_strains
+    cumulative_detections[i] = sum(detection_by_strain)/n_strains
 end
 
-cumul_df = DataFrame(sim=1:10000, cumulative_detections=cumulative_detections)
+cumul_df = DataFrame(sim = 1:10000, cumulative_detections = cumulative_detections)
 interaction_scores = CSV.read("Data/interaction_scores.csv", DataFrame)
 
 cumulative_detections_seir = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
     @mutate(sim = 1:10000) # simulation IDs
     @left_join(cumul_df, sim)
     @left_join(interaction_scores, sim)
-    @mutate(competition_score = total_competition / strains,
-        facilitation_score = total_facilitation / strains,
+    @mutate(
+        competition_score = total_competition/strains,
+        facilitation_score = total_facilitation/strains
+    )
+    @mutate(
         cf_cat = case_when(
-            cf_ratio <= 0.4 => "high competition",
-            cf_ratio <= 0.6 => "neutral",
-            cf_ratio > 0.4 => "high facilitation",
-        ))
+            facilitation_score - competition_score <= -1 => "high competition",
+            facilitation_score - competition_score <= 1 => "neutral", 
+            facilitation_score - competition_score > 1 => "high facilitation"
+        )
+    )
 end
 
-cumulative_detections_seir.cf_ratio_group = CategoricalArray(cumulative_detections_seir.cf_ratio_group,
-    levels=["high competition", "neutral", "high facilitation"],
-    ordered=true)
+cumulative_detections_seir.cf_cat = CategoricalArray(cumulative_detections_seir.cf_cat, 
+                                   levels = ["high competition", "neutral", "high facilitation"],
+                                   ordered = true)
 
-p1 =
-    ggplot(cumulative_detections_seir, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_ratio_group)) +
-    geom_point(alpha=0.1) +
-    geom_smooth(linewidth=20) +
-    scale_y_continuous(name="Cumulative Parasite Species Detections") +
-    scale_x_continuous(name="Proportion of Host Population Sampled") +
-    labs(color="Interaction Type", title="Species Accumulation Curve: SEIR model") +
-    scale_color_manual(values=["#BB5566FF", "#DDAA33FF", "#004488FF"])
+p1 = ggplot(cumulative_detections_seir, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
+    geom_point(alpha = 0.1) +
+    geom_smooth(linewidth = 20) +
+    scale_y_continuous(name = "Proportion of Parasite Species Detected") +
+    scale_x_continuous(name = "Proportion of Host Population Sampled") +
+    labs(color = "Interaction Type", title = "Species Accumulation Curve: SEIR model") +
+    scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
 
 CSV.write("Data/seir_cumulative_detection.csv", cumulative_detections_seir)
 
@@ -561,7 +499,7 @@ for i in 1:n_sims
     for i in 1:n_strains
         strains[i] = SIModel(
             rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
-            rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
+            rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1))
         )
     end
     # Initialize population - everyone starts susceptible
@@ -579,7 +517,7 @@ for i in 1:n_sims
         1, # Age of maturity
         :simultaneous, # introduction of strains
         100, # time steps
-        :frequency, # transmission type
+        :frequency # transmission type
     )
 
     true_pop = simulate(initial_pop, params)
@@ -594,35 +532,44 @@ for i in 1:n_sims
 
     detection_by_strain = sum(detections, dims=1) .> 1
 
-    cumulative_detections_si[i] = sum(detection_by_strain)
+    cumulative_detections_si[i] = sum(detection_by_strain)/n_strains
 end
 
-cumul_df = DataFrame(sim=1:10000, cumulative_detections=cumulative_detections_si)
+cumul_df = DataFrame(sim = 1:10000, cumulative_detections = cumulative_detections_si)
 
 cumulative_detections_si = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
     @mutate(sim = 1:10000) # simulation IDs
     @left_join(cumul_df, sim)
-    @mutate(cf_ratio_group = case_when(
-        cf_ratio <= 0.4 => "high competition",
-        cf_ratio <= 0.6 => "neutral",
-        cf_ratio > 0.6 => "high facilitation",
-    ))
+    @left_join(interaction_scores, sim)
+    @mutate(
+        competition_score = total_competition/strains,
+        facilitation_score = total_facilitation/strains
+    )
+    @mutate(
+        cf_cat = case_when(
+            facilitation_score - competition_score <= -1 => "high competition",
+            facilitation_score - competition_score <= 1 => "neutral", 
+            facilitation_score - competition_score > 1 => "high facilitation"
+        )
+    )
 end
 
-cumulative_detections_si.cf_ratio_group = CategoricalArray(cumulative_detections_si.cf_ratio_group,
-    levels=["high competition", "neutral", "high facilitation"],
-    ordered=true)
+cumulative_detections_si.cf_cat = CategoricalArray(cumulative_detections_si.cf_cat, 
+                                   levels = ["high competition", "neutral", "high facilitation"],
+                                   ordered = true)
 
-p2 =
-    ggplot(cumulative_detections_si, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_ratio_group)) +
-    geom_point(alpha=0.1) +
-    geom_smooth(linewidth=3) +
-    scale_y_continuous(name="Cumulative Parasite Species Detections") +
-    scale_x_continuous(name="Proportion of Host Population Sampled") +
-    labs(color="Interaction Type", title="Species Accumulation Curve: SI model") +
-    scale_color_manual(values=["#BB5566FF", "#DDAA33FF", "#004488FF"])
+p2 = ggplot(cumulative_detections_si, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
+    geom_point(alpha = 0.1) +
+    geom_smooth(linewidth = 3) +
+    scale_y_continuous(name = "Proportion of Parasite Species Detected") +
+    scale_x_continuous(name = "Proportion of Host Population Sampled") +
+    labs(color = "Interaction Type", title = "Species Accumulation Curve: SI model") +
+    scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
 
 CSV.write("Data/si_cumulative_detection.csv", cumulative_detections_si)
+
+ggsave(p2, "Figures/Fig2b_si_species.png")
+ggsave(p1, "Figures/Fig2a_seir_species.png")
 ```
 
 The results don't amount to much, mainly because cutting up the C:F ratio into gross categories like this doesn't really capture the non-linear relationship between C:F ratio, interaction strength, and error rate that you can observe in the Shapley plots above.
@@ -649,7 +596,7 @@ for i in 1:n_sims
             rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1)),
-            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10))),
+            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10)))
         )
     end
     # Initialize population - everyone starts susceptible
@@ -667,7 +614,7 @@ for i in 1:n_sims
         1, # Age of maturity
         :simultaneous, # introduction of strains
         n_timesteps,
-        :density, # transmission type
+        :density # transmission type
     )
 
     true_pop = simulate(initial_pop, params)
@@ -699,175 +646,40 @@ Now that I have the site/species matrices needed for cooccurrence analysis, I'll
 library(tidyverse)
 library(arrow)
 library(cooccur)
-library(furrr)
 quiet <- function(x) {
-    sink(tempfile())
-    on.exit(sink())
-    invisible(force(x))
+  sink(tempfile())
+  on.exit(sink())
+  invisible(force(x))
 }
 
 handle_site_species_matrix <- function(file) {
-    m <- read_feather(file) |> as.matrix()
-    cooccurrence_analysis <- tryCatch(
-        {
-            quiet(cooccur(
-                test_matrix,
-                thresh = T,
-                spp_names = FALSE,
-                prob = "comb"
-            ))
-        },
-        error = function(e) {
-            return(NA)
-        }
-    )
-    if (!is.na(cooccurrence_analysis)) {
-        competitive_pairs <- cooccurrence_analysis |>
-            _$results |>
-            filter(exp_cooccur >= 1, p_lt < 0.05) |>
-            nrow()
-        facilitative_pairs <- cooccurrence_analysis$results |>
-            filter(exp_cooccur >= 1, p_gt < 0.05) |>
-            nrow()
-        return(tibble(
-            file = file,
-            competitive_pairs = competitive_pairs,
-            facilitative_pairs = facilitative_pairs
-        ))
-    } else {
-        return(NA)
+  m <- read_feather(file) |> as.matrix()
+  tryCatch(
+    {
+      cooccurrence_analysis <- quiet(cooccur(
+        test_matrix,
+        thresh = T,
+        spp_names = FALSE,
+        prob = "comb"
+      ))
+    },
+    error = function(e) {
+      return(NA)
     }
+  )
+  competitive_pairs <- cooccurrence_analysis$results |>
+    filter(exp_cooccur >= 1, p_lt < 0.05) |>
+    nrow()
+  facilitative_pairs <- cooccurrence_analysis$results |>
+    filter(exp_cooccur >= 1, p_gt < 0.05) |>
+    nrow()
+  return(tibble(
+    file = file,
+    competitive_pairs = competitive_pairs,
+    facilitative_pairs = facilitative_pairs
+  ))
 }
 test_matrix <- handle_site_species_matrix(
-    "Data/seir_site_species_matrices/sim_1_timestep_1.arrow"
+  "Data/seir_site_species_matrices/sim_1_timestep_1.arrow"
 )
-pairs_df <- "Data/seir_site_species_matrices/" |>
-    here() |>
-    list.files(full.names = T) |>
-    future_map(handle_site_species_matrix) |>
-    discard(\(x) is.na(x)) |>
-    list_rbind()
-pairs_df
 ```
-
-For the SEIR system, I can't detect interactions at any of the simulation/timestep matrices! This fits somewhat with the sparse findings from the *Daphnia* data, where there's a lot of turnover in the system and I had to control for the effects of time. Hard to detect interactions in that case. However, things may be different in the SI system.
-
-```{julia simulate_communities_si}
-input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
-matrices = create_interaction_matrix(input_df)
-n_individuals = 1000
-n_timesteps = 100
-
-results = Vector{Vector{BitMatrix}}(undef, n_sims)
-
-# Simulate
-for i in 1:n_sims
-    # Create SI strains
-    n_strains = Int(input_df.strains[i])
-    strains = Vector{SIModel}(undef, n_strains)
-    for i in 1:n_strains
-        strains[i] = SIModel(
-            rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
-            rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
-        )
-    end
-    # Initialize population - everyone starts susceptible
-    initial_pop = Population(Individual[])
-    for i in 1:n_individuals
-        individual = Individual(n_strains, 1)  # age 1
-        push!(initial_pop.individuals, individual)
-    end
-    # Set simulation parameters
-    params = SimulationParameters(
-        strains,
-        matrices[i],
-        0.0, # base mortality
-        0.0, # fecundity
-        1, # Age of maturity
-        :simultaneous, # introduction of strains
-        100, # time steps
-        :frequency, # transmission type
-    )
-
-    true_pop = simulate(initial_pop, params)
-
-    timestep_matrices = Vector{BitMatrix}()
-    for pop in true_pop
-        if !isempty(pop.individuals)
-            timestep = hcat([ind.state[:, 3] for ind in pop.individuals]...)
-            push!(timestep_matrices, timestep)
-        end
-    end
-
-    results[i] = timestep_matrices
-end
-
-for (sim_idx, sim_data) in enumerate(results)
-    for (timestep_idx, matrix) in enumerate(sim_data)
-        int_matrix = Int.(Array(matrix))
-        df = DataFrame(int_matrix, :auto)
-        Arrow.write("Data/si_site_species_matrices/sim_$(sim_idx)_timestep_$(timestep_idx).arrow",
-            df)
-    end
-end
-```
-
-Here I try to detect interacting pairs in the SI simulations.
-
-```{r detect_pairs_si}
-library(tidyverse)
-library(arrow)
-library(cooccur)
-library(furrr)
-library(here)
-quiet <- function(x) {
-    sink(tempfile())
-    on.exit(sink())
-    invisible(force(x))
-}
-
-handle_site_species_matrix <- function(file) {
-    m <- read_feather(file) |> as.matrix()
-    cooccurrence_analysis <- tryCatch(
-        {
-            quiet(cooccur(
-                test_matrix,
-                thresh = T,
-                spp_names = FALSE,
-                prob = "comb"
-            ))
-        },
-        error = function(e) {
-            return(NA)
-        }
-    )
-    if (!is.na(cooccurrence_analysis)) {
-        competitive_pairs <- cooccurrence_analysis |>
-            _$results |>
-            filter(exp_cooccur >= 1, p_lt < 0.05) |>
-            nrow()
-        facilitative_pairs <- cooccurrence_analysis$results |>
-            filter(exp_cooccur >= 1, p_gt < 0.05) |>
-            nrow()
-        return(tibble(
-            file = file,
-            competitive_pairs = competitive_pairs,
-            facilitative_pairs = facilitative_pairs
-        ))
-    } else {
-        return(NA)
-    }
-}
-test_matrix <- handle_site_species_matrix(
-    "Data/si_site_species_matrices/sim_105_timestep_20.arrow"
-)
-pairs_df <- "Data/si_site_species_matrices/" |>
-    here() |>
-    list.files(full.names = T) |>
-    future_map(handle_site_species_matrix) |>
-    discard(\(x) is.na(x)) |>
-    list_rbind()
-pairs_df
-```
-
-This method can't detect interacting pairs in the SI simulations either!

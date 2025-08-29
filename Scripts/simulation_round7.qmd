@@ -225,8 +225,8 @@ for col in names(simulation_output_seir)
 end
 
 ggplot(simulation_output_seir) +
-    geom_histogram(aes(x=:error_rate), bins=50) +
-    scale_y_log10()
+	geom_histogram(aes(x=:error_rate), bins=50) +
+	scale_y_log10()
 ```
 
 This is like a negative exponential distribution of error rates for the density-dependent SEIR simulations.
@@ -335,7 +335,6 @@ library(tidymodels)
 library(stringr)
 library(vip)
 library(future)
-plan(multicore)
 
 input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects", "recovery", "latency")][, sim := 1:10000]
 simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:10000] |>
@@ -346,15 +345,7 @@ simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:1000
 si_split <- initial_split(simulation_output_si[, -c("sim", "Detections")], strata = error_rate)
 si_train <- training(si_split)
 si_test <- testing(si_split)
-tune_spec_si <- boost_tree(
-    trees = tune(),
-    min_n = tune(),
-    learn_rate = tune(),
-    tree_depth = tune(),
-    loss_reduction = tune(),
-    sample_size = tune(),
-    mtry = tune()
-) |>
+tune_spec_si <- boost_tree() |>
     set_engine("xgboost") |>
     set_mode("regression")
 si_folds <- vfold_cv(si_train, 4)
@@ -365,8 +356,31 @@ si_res <- workflow() |>
         resamples = si_folds,
         control = control_grid(verbose = T)
     )
-best_tree_si <- si_res |> select_best(metric = "rmse")
+best_tree_si <- list(
+    trees = 1555,
+    min_n = 23,
+    learn_rate = 0.316,
+    tree_depth = 10,
+    loss_reduction = 1.90e-9,
+    sample_size = 1,
+    mtry = 8,
+    stop_iter = 1000
+)
+final_wf_si <- workflow() |>
+    add_model(tune_spec_si) |>
+    add_formula(error_rate ~ competition_score + facilitation_score + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission) |>
+    finalize_workflow(best_tree_si)
+final_fit_si <- final_wf_si %>%
+    last_fit(si_split)
+final_fit_si %>%
+    collect_metrics()
+final_fit_si |>
+    extract_workflow() |>
+    extract_fit_parsnip() %>%
+    vip()
 ```
+
+Intriguingly, competition and facilitation scores are nearly insignificant in the frequency-dependent SI simulations. The most important parameters are number of strains, and timestep.
 
 Let's examine these results more closely using plots of Shapley values.
 
@@ -393,7 +407,87 @@ shap.plot.summary(shap_long_seir)
 
 source(here("Scripts/shapley_plots.R"))
 library(patchwork)
-partial.dependence.plot(colnames(train_matrix_seir), shap_long_seir, as.data.frame(train_matrix_seir), c("#4F6980FF", "#849DB1FF", "#A2CEAAFF", "#638B66FF", "#BFBB60FF", "#F47942FF", "#FBB04EFF", "#B66353FF", "#D7CE9FFF", "#B9AA97FF", "#7E756DFF"), var_names)
+p1 <- partial.dependence.plot(
+  colnames(train_matrix_seir),
+  shap_long_seir,
+  as.data.frame(train_matrix_seir),
+  c(
+    "#4F6980FF",
+    "#849DB1FF",
+    "#A2CEAAFF",
+    "#638B66FF",
+    "#BFBB60FF",
+    "#F47942FF",
+    "#FBB04EFF",
+    "#B66353FF",
+    "#D7CE9FFF",
+    "#B9AA97FF"
+  ),
+  var_names
+)
+plot(p1)
+```
+
+We're replicating results from the simpler simulations of previous rounds here.
+
+```{r shapley_plots_si}
+# Create the model matrix using the same formula as workflow
+formula_si <- error_rate ~
+  competition_score +
+    facilitation_score +
+    timestep +
+    strains +
+    proportion_sampled +
+    false_negative +
+    disease_mortality +
+    transmission
+train_matrix_si <- si_test |>
+  slice_sample(prop = 0.1) |>
+  model.matrix(object = formula_si, data = _) |>
+  _[, -1] # remove intercept
+var_names <- c(
+  "Competition Score",
+  "Facilitation Score",
+  "Timestep",
+  "Strains",
+  "Prop. Sampled",
+  "False Negative",
+  "Disease Mortality",
+  "Transmission"
+)
+# Extract the xgboost model
+xgb_model_si <- final_fit_si %>%
+  extract_workflow() %>%
+  extract_fit_parsnip() %>%
+  .$fit
+
+# Compute SHAP values
+library(SHAPforxgboost)
+shapley_data_si <- shap.values(xgb_model_si, as.matrix(train_matrix_si))
+shap_long_si <- shap.prep(
+  shap_contrib = shapley_data_si$shap_score,
+  X_train = train_matrix_si
+)
+shap.plot.summary(shap_long_si)
+source(here("Scripts/shapley_plots.R"))
+
+p2 <- partial.dependence.plot(
+  colnames(train_matrix_si),
+  shap_long_si,
+  as.data.frame(train_matrix_si),
+  c(
+    "#4F6980FF",
+    "#849DB1FF",
+    "#A2CEAAFF",
+    "#638B66FF",
+    "#BFBB60FF",
+    "#F47942FF",
+    "#FBB04EFF",
+    "#B66353FF"
+  ),
+  var_names
+)
+
 ```
 
 # Accumulation Curves

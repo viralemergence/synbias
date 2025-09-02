@@ -316,7 +316,6 @@ df_cf |>
     ) +
     ylab("# of Interacting Pairs") +
     xlab("# of Snails sampled at site")
-
 ```
 
 We can see here that there are variables that are correlated with the number of competitive and facilitative pairs. Species richness of parasites is positively correlated with competitive but not facilitative pairs. Infection intensity is the same.
@@ -447,6 +446,14 @@ bootstrap_detect |>
         x = "# of Snails Sampled at Site",
         y = "Number of Interacting Pairs"
     )
+bootstrap_detect |> 
+    mutate(Interactions = if_else(competitive_pairs - facilitative_pairs > 10, "Higher competition", "Lower competition")) |>
+    ggplot(aes(x = downsample_size, y = richness_estimate, col = Interactions)) +
+    geom_jitter() +
+    geom_smooth() +
+    theme_minimal() +
+    scale_color_manual(c("#007BC3FF", "#54BCD1FF"))
+
 ```
 
 The true field samples are marked here with diamonds, while the simulated samples are marked with points.

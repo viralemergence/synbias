@@ -275,10 +275,14 @@ library(future)
 plan(multicore)
 
 input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects")][, sim := 1:10000]
+interaction_scores <- fread(here("Data/interaction_scores.csv"))
 simulation_output_seir <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:10000] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
+    merge(x = _, y = interaction_scores, by = "sim") |>
+    _[, competition_score := total_competition/strains] |>
+    _[, facilitation_score := total_facilitation/strains] |>
     _[, error_rate := abs(strains - Detections) / strains]
 synbias_split <- initial_split(simulation_output_seir[, -c("sim", "Detections")], strata = error_rate)
 synbias_train <- training(synbias_split)
@@ -314,7 +318,7 @@ best_tree_seir <- list(
 )
 final_wf_seir <- workflow() |>
     add_model(tune_spec_seir) |>
-    add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
+    add_formula(error_rate ~ competition_score + facilitation_score + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery) |>
     finalize_workflow(best_tree_seir)
 final_fit_seir <- final_wf_seir %>%
     last_fit(synbias_split)
@@ -337,25 +341,21 @@ library(vip)
 library(future)
 
 input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects", "recovery", "latency")][, sim := 1:10000]
+interaction_scores <- fread(here("Data/interaction_scores.csv"))
 simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:10000] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
+    merge(x = _, y = interaction_scores, by = "sim") |>
+    _[, competition_score := total_competition/strains] |>
+    _[, facilitation_score := total_facilitation/strains] |>
     _[, error_rate := abs(strains - Detections) / strains]
-si_split <- initial_split(simulation_output_si[, -c("sim", "Detections")], strata = error_rate)
+si_split <- initial_split(simulation_output_si[, -c("sim", "Detections", "cf_ratio", "interaction_strength")], strata = error_rate)
 si_train <- training(si_split)
 si_test <- testing(si_split)
 tune_spec_si <- boost_tree() |>
     set_engine("xgboost") |>
     set_mode("regression")
-si_folds <- vfold_cv(si_train, 4)
-si_res <- workflow() |>
-    add_model(tune_spec_si) |>
-    add_formula(error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission) |>
-    tune_grid(
-        resamples = si_folds,
-        control = control_grid(verbose = T)
-    )
 best_tree_si <- list(
     trees = 1555,
     min_n = 23,
@@ -384,14 +384,14 @@ Intriguingly, competition and facilitation scores are nearly insignificant in th
 
 Let's examine these results more closely using plots of Shapley values.
 
-```{r shapley_plots}
+```{r shapley_plots_seir}
 # Create the model matrix using the same formula as workflow
-formula_seir <- error_rate ~ cf_ratio * interaction_strength + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
-train_matrix_seir <- si_test |>
+formula_seir <- error_rate ~ competition_score + facilitation_score + timestep + strains + proportion_sampled + false_negative + disease_mortality + transmission + latency + recovery
+train_matrix_seir <- synbias_test |>
     slice_sample(prop = 0.1) |>
-    model.matrix(object = formula, data = _) |>
+    model.matrix(object = formula_seir, data = _) |>
     _[, -1] # remove intercept
-var_names <- c("C:F Ratio", "Interaction Strength", "Timestep", "Strains", "Prop. Sampled", "False Negative", "Disease Mortality", "Transmission", "Latency", "Recovery", "CF Ratio x Strength")
+var_names <- c("Competition Score", "Facilitation Score", "Timestep", "Strains", "Prop. Sampled", "False Negative", "Disease Mortality", "Transmission", "Latency", "Recovery")
 
 # Extract the xgboost model
 xgb_model_seir <- final_fit_seir %>%
@@ -487,7 +487,7 @@ p2 <- partial.dependence.plot(
   ),
   var_names
 )
-
+plot(p2)
 ```
 
 # Accumulation Curves

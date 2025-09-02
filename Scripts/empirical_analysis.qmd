@@ -340,6 +340,7 @@ sites_to_keep <- c("c2", "c3", "c7", "c8", "f1", "f2", "f3", "f4", "f5")
 analyze_site_dt <- function(site_data) {
     # 1. Prepare matrix
     matrix <- snail_data_prep(site_data)
+    species_count <- nrow(matrix)
 
     # 2. Handle cases where matrix is too small for cooccur
     if (!is.matrix(matrix) || nrow(matrix) < 2 || ncol(matrix) < 2) {
@@ -364,7 +365,7 @@ analyze_site_dt <- function(site_data) {
     facilitative_count <- nrow(results_df[exp_cooccur >= 1 & p_gt < 0.05])
 
     # 5. Return a list of the final counts
-    list(competitive = competitive_count, facilitative = facilitative_count)
+    list(competitive = competitive_count, facilitative = facilitative_count, species_richness = species_count)
 }
 
 
@@ -380,7 +381,7 @@ bootstrap_detect <- future_map(
         pair_counts_dt <- subsample_dt[, analyze_site_dt(.SD), by = site]
         setnames(
             pair_counts_dt,
-            c("site", "competitive_pairs_estimate", "facilitative_pairs_estimate")
+            c("site", "competitive_pairs_estimate", "facilitative_pairs_estimate", "richness_estimate")
         )
 
         melted_subsample <- melt(
@@ -390,12 +391,7 @@ bootstrap_detect <- future_map(
             value.name = "trematode"
         )[trematode %in% trematodes]
 
-        richness_dt <- unique(
-            melted_subsample,
-            by = c("Snail no.", "trematode", "site")
-        )[, .(richness_estimate = .N), by = site]
-
-        results_dt <- df_cf[richness_dt, on = "site"][pair_counts_dt, on = "site"]
+        results_dt <- df_cf[pair_counts_dt, on = "site"]
         results_dt[
             ,
             bias := abs(true_species_richness - richness_estimate) /
@@ -408,52 +404,36 @@ bootstrap_detect <- future_map(
     .progress = TRUE
 ) |>
     rbindlist()
-
-bootstrap_detect |>
-    mutate(
-        bias = abs(true_species_richness - richness_estimate) /
-            true_species_richness
-    ) |>
-    tidyplot(x = facilitative_pairs, y = bias) |>
-    add_data_points_beeswarm(color = "#C70E7BFF", alpha = 0.4) |>
-    add_curve_fit(method = "lm", color = "#FC6882FF", linewidth = 3) |>
-    adjust_y_axis_title("Bias in Species Richness Estimate") |>
-    adjust_x_axis_title("Number of Facilitative Pairs")
-bootstrap_detect |>
-    mutate(
-        bias = abs(true_species_richness - richness_estimate) /
-            true_species_richness
-    ) |>
-    tidyplot(x = competitive_pairs, y = bias) |>
-    add_data_points_beeswarm(color = "#C70E7BFF", alpha = 0.4) |>
-    add_curve_fit(method = "lm", color = "#FC6882FF", linewidth = 3)
 ```
 
 There is pretty much no effect of facilitative or competitive pairs on the bias in species richness estimates. However, there may be some effect of sample size, infection intensity, and true species richness on bias. Later I will use a correlogram to try to get at confounding variables.
 
 ```{r interaction accumulation curve, message = F}
-bootstrap_detect |>
+p1 <- bootstrap_detect |>
     ggplot(aes(x = downsample_size)) +
-    geom_jitter(aes(y = facilitative_pairs_estimate), color = "#EF7C12FF", alpha = 0.3) +
-    geom_jitter(aes(y = competitive_pairs_estimate), color = "#007BC3FF", alpha = 0.3) +
-    geom_smooth(aes(y = facilitative_pairs_estimate), color = "#F4B95AFF", method = "gam", alpha = 0.7, linewidth = 2) +
-    geom_smooth(aes(y = competitive_pairs_estimate), color = "#54BCD1FF", method = "gam", alpha = 0.7, linewidth = 2) +
-    geom_point(data = df_cf, aes(x = sample_size, y = facilitative_pairs), color = "#EF7C12FF", size = 4, shape = 18) +
-    geom_point(data = df_cf, aes(x = sample_size, y = competitive_pairs), color = "#007BC3FF", size = 4, shape = 18) +
+    geom_jitter(aes(y = facilitative_pairs_estimate), color = "#007BC3FF", alpha = 0.3) +
+    geom_jitter(aes(y = competitive_pairs_estimate), color = "#EF7C12FF", alpha = 0.3) +
+    geom_smooth(aes(y = facilitative_pairs_estimate), color = "#54BCD1FF", method = "gam", alpha = 0.7, linewidth = 2) +
+    geom_smooth(aes(y = competitive_pairs_estimate), color = "#F4B95AFF", method = "gam", alpha = 0.7, linewidth = 2) +
+    geom_point(data = df_cf, aes(x = sample_size, y = facilitative_pairs), color = "#007BC3FF", size = 4, shape = 18) +
+    geom_point(data = df_cf, aes(x = sample_size, y = competitive_pairs), color = "#EF7C12FF", size = 4, shape = 18) +
     theme_minimal() +
     labs(
-        title = "Interaction Accumulation Curve (blue = competitive, orange = facilitative)",
-        x = "# of Snails Sampled at Site",
-        y = "Number of Interacting Pairs"
+        title = "A. Interaction Accumulation Curves (blue = facilitative, orange = competitive)",
+        x = "Number of Snails Sampled at Site",
+        y = "Number of Interacting Parasite Pairs"
     )
-bootstrap_detect |> 
+p2 <- bootstrap_detect |> 
     mutate(Interactions = if_else(competitive_pairs - facilitative_pairs > 10, "Higher competition", "Lower competition")) |>
     ggplot(aes(x = downsample_size, y = richness_estimate, col = Interactions)) +
-    geom_jitter() +
-    geom_smooth() +
+    geom_jitter(alpha = 0.3) +
+    geom_smooth(linewidth = 2) +
     theme_minimal() +
-    scale_color_manual(c("#007BC3FF", "#54BCD1FF"))
-
+    scale_color_manual(values = c("#BB5566FF", "#DDAA33FF")) +
+    ggtitle("B. Species Accumulation Curves") +
+    xlab("Number of Snails Sampled at Site") +
+    ylab("Number of Parasite Species Detected")
+p1 / p2
 ```
 
 The true field samples are marked here with diamonds, while the simulated samples are marked with points.

@@ -14,8 +14,14 @@
 #' grab the values.
 #' @param colors_vec A vector of color values that should be equal in length
 #'  to the number of variables given
-#' @param labels A character vector of labels for the subplots (if NULL,
-#' the column names will be used)
+#' @param data_labels A character vector of labels for the subplots (if NULL,
+#' the column names will be used). The labels must be in the same order as
+#' `variables`.
+#' @param importance An optional argument that allows for the subplots to be
+#' ordered from most to least important. If `importance` is provided in the
+#' form of a data frame with a `character`/`factor` column with the `variables`
+#' and a `double` column with importance scores, the subplots will be displayed
+#' from most to least important.
 #' @return Returns a partial dependence plot object that is actually 33
 #' panels (16 panels of partial dependence plots, 16 panels of the density
 #'  curves showing the distribution of values in the training data, panel of
@@ -26,7 +32,8 @@ partial.dependence.plot <- function(
   shapley_data,
   train_data,
   colors_vec,
-  labels = NULL
+  data_labels = NULL,
+  importance = NULL
 ) {
   # Argument checking
   num_variables <- length(variables)
@@ -51,13 +58,51 @@ partial.dependence.plot <- function(
   if (!all(variables %in% colnames(train_data))) {
     stop("All variables must be present in the train_data.")
   }
-  if (is.null(labels)) {
-    labels <- variables
+  if (!is.null(importance)) {
+    if (!is.data.frame(importance)) {
+      stop("`importance` must be a data frame.")
+    }
+    if (!all(complete.cases(importance))) {
+      stop("`importance` must not contain NA values.")
+    }
+    if (ncol(importance) > 2) {
+      stop(
+        "`importance` must have 2 columns: a column with the variable names
+       and a column with the importance scores."
+      )
+    }
+    importance_class <- map_chr(importance, class)
+    if (!any(c("character", "factor") %in% importance_class)) {
+      stop(
+        "`importance` must have a character or factor column defining the
+        variable names"
+      )
+    }
+    if (!("numeric" %in% importance_class)) {
+      stop("`importance` must have a numeric column with importance scores")
+    }
+    score_index <- names(importance)[which(importance_class == "numeric")]
+    name_index <- which(
+      importance_class %in% c("character", "factor")
+    )
+    if (!all(variables %in% pull(importance, name_index))) {
+      stop("All `variables` must be in the `importance` data frame")
+    }
+    importance <- importance[match(variables, pull(importance, name_index)), ]
+    if (!is.null(data_labels)) {
+      importance$labels <- data_labels
+    }
+    setorderv(importance, score_index, -1)
+    variables <- pull(importance, name_index)
+    data_labels <- pull(importance, labels)
   }
-  if (length(labels) != num_variables) {
+  if (is.null(data_labels)) {
+    data_labels <- variables
+  }
+  if (length(data_labels) != num_variables) {
     stop("The number of labels must match the number of variables.")
   }
-  if (!is.character(labels)) {
+  if (!is.character(data_labels)) {
     stop("Labels must be a character vector.")
   }
 
@@ -79,10 +124,6 @@ partial.dependence.plot <- function(
     data.frame()
   PDPR <- shapley_data %>%
     filter(variable %in% variables)
-  PDPR %>%
-    filter(variable %in% variables) %>%
-    group_by(variable) %>%
-    summarise(min = min(value), max = max(value))
 
   # Plotting
   PDP <- lapply(1:num_variables, function(i) {
@@ -99,7 +140,7 @@ partial.dependence.plot <- function(
         se = F,
         linewidth = 1.5
       ) +
-      labs(y = NULL, x = labels[i]) +
+      labs(y = NULL, x = data_labels[i]) +
       theme(
         aspect.ratio = 0.45,
         panel.background = element_rect(fill = "white", color = "grey50"),
@@ -135,7 +176,7 @@ partial.dependence.plot <- function(
       ) +
       scale_x_continuous(position = "bottom", labels = dropLeadingZero) +
       scale_y_reverse(expand = expansion(mult = c(0.1, 0))) +
-      labs(x = labels[i], y = NULL) +
+      labs(x = data_labels[i], y = NULL) +
       theme(
         panel.background = element_rect(fill = "white", color = "grey50"),
         panel.grid.major = element_line(color = "grey80"),

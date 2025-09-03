@@ -324,6 +324,10 @@ final_fit_seir <- final_wf_seir %>%
     last_fit(synbias_split)
 final_fit_seir %>%
     collect_metrics()
+import_df <- final_fit_seir |>
+    extract_workflow() |>
+    extract_fit_parsnip() %>%
+    vi()
 final_fit_seir |>
     extract_workflow() |>
     extract_fit_parsnip() %>%
@@ -374,6 +378,10 @@ final_fit_si <- final_wf_si %>%
     last_fit(si_split)
 final_fit_si %>%
     collect_metrics()
+import_df_si <- final_fit_si |>
+    extract_workflow() |>
+    extract_fit_parsnip() %>%
+    vi()
 final_fit_si |>
     extract_workflow() |>
     extract_fit_parsnip() %>%
@@ -423,7 +431,8 @@ p1 <- partial.dependence.plot(
     "#D7CE9FFF",
     "#B9AA97FF"
   ),
-  var_names
+  var_names,
+  import_df
 )
 plot(p1)
 ```
@@ -485,9 +494,12 @@ p2 <- partial.dependence.plot(
     "#FBB04EFF",
     "#B66353FF"
   ),
-  var_names
+  var_names,
+  import_df_si
 )
 plot(p2)
+cowplot::plot_grid(p1, p2, ncol = 1, labels = "AUTO", label_size = 20, rel_heights = c(1.2, 1))
+ggsave(filename = "Figures/Fig3_shapley.png")
 ```
 
 # Accumulation Curves

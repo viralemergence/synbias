@@ -1,6 +1,7 @@
 library(tidyverse)
 library(here)
 library(cooccur)
+library(patchwork)
 knitr::opts_chunk$set(dpi = 300, dev = "png")
 options(list(dplyr.summarise.inform = FALSE, future.rng.onMisuse = "ignore"))
 daphnia <- readxl::read_excel(
@@ -181,8 +182,10 @@ p1 <- df_cf |>
     width = 0.6
   ) +
   geom_hline(yintercept = 0, color = "black", linewidth = 1) +
+  ggtitle(
+    bquote(bold("A.") ~ "Species Associations in" ~ italic("C. californica"))
+  ) +
   labs(
-    title = "A. Species Associations in C. californica",
     x = "Site",
     y = "Count (Facilitative above, Competitive below)"
   ) +
@@ -245,10 +248,10 @@ p2 <- daphnia |>
   ) +
   xlab("Number of Associations per Site/Month") +
   ggtitle(
-    "B. Species Associations in Daphnia (blue = positive, orange = negative)"
+    bquote(bold("B.") ~ "Species Associations in" ~ italic("Daphnia"))
   ) +
   theme_minimal() +
   scale_fill_manual(values = c("#EF7C12FF", "#007BC3FF")) +
   scale_x_continuous(breaks = c(0, 1))
-ggsave("Figures/Fig4a_snail.png", p1, width = 8, height = 4)
-ggsave("Figures/Fig4b_daphnia.png", p2, width = 8, height = 4)
+p1 / p2
+ggsave(filename = "Figures/Fig4_empirical_summary.png")

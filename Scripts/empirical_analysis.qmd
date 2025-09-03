@@ -406,8 +406,6 @@ bootstrap_detect <- future_map(
     rbindlist()
 ```
 
-There is pretty much no effect of facilitative or competitive pairs on the bias in species richness estimates. However, there may be some effect of sample size, infection intensity, and true species richness on bias. Later I will use a correlogram to try to get at confounding variables.
-
 ```{r interaction accumulation curve, message = F}
 p1 <- bootstrap_detect |>
     ggplot(aes(x = downsample_size)) +
@@ -500,6 +498,7 @@ gp_model |>
         ),
         upper = `Param.` + `Std. dev.`,
         lower = `Param.` - `Std. dev.`
+
     ) |>
     ggplot(aes(x = term, y = `Param.`)) +
     geom_col(fill = "#FC6882FF") +
@@ -512,7 +511,7 @@ gp_model |>
     theme_minimal()
 ```
 
-Sample size and true species richness are significant predictors of bias in species richness estimates (there is more bias at low sample size and high species richness). Competition and facilatition are too confounded with infection intensity to have any effect, it seems.
+I'm frankly suspicious of these results as they stand; how could sample size not affect bias? The correlogram clearly shows a relationship.
 
 Another idea I want to explore is to fit species accumulation curves to the number of competitive and facilitative pairs and use them to calculate how many snails one needs to sample in order to find all of the pairs.
 

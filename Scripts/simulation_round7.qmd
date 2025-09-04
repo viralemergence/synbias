@@ -281,8 +281,8 @@ simulation_output_seir <- fread(here("Data/simulation_round7_output.csv"))[, sim
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
     merge(x = _, y = interaction_scores, by = "sim") |>
-    _[, competition_score := total_competition/strains] |>
-    _[, facilitation_score := total_facilitation/strains] |>
+    _[, competition_score := total_competition/(strains^2)] |>
+    _[, facilitation_score := total_facilitation/(strains^2)] |>
     _[, error_rate := abs(strains - Detections) / strains]
 synbias_split <- initial_split(simulation_output_seir[, -c("sim", "Detections")], strata = error_rate)
 synbias_train <- training(synbias_split)
@@ -351,8 +351,8 @@ simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:1000
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
     merge(x = _, y = interaction_scores, by = "sim") |>
-    _[, competition_score := total_competition/strains] |>
-    _[, facilitation_score := total_facilitation/strains] |>
+    _[, competition_score := total_competition/(strains^2)] |>
+    _[, facilitation_score := total_facilitation/(strains^2)] |>
     _[, error_rate := abs(strains - Detections) / strains]
 si_split <- initial_split(simulation_output_si[, -c("sim", "Detections", "cf_ratio", "interaction_strength")], strata = error_rate)
 si_train <- training(si_split)
@@ -499,7 +499,166 @@ p2 <- partial.dependence.plot(
 )
 plot(p2)
 cowplot::plot_grid(p1, p2, ncol = 1, labels = "AUTO", label_size = 20, rel_heights = c(1.2, 1))
-ggsave(filename = "Figures/Fig3_shapley.png")
+ggsave(filename = "Figures/Fig3_shapley.png", width = 10, height = 12, units = "in")
+```
+
+## Epidemic Duration
+
+I think that epidemic duration explains a lot about the results I've seen here so far. The error rate depends on epidemic duration (how many timesteps the outbreaks are active) and epidemic duration is affected by the simulation parameters. I'm going to test this by measuring epidemic duration across simulations.
+
+```{julia epidemic_duration}
+input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+matrices = create_interaction_matrix(input_df)
+n_individuals = 1000
+
+# Collect detection vectors
+mean_epidemic_duration = zeros(n_sims)
+
+# Simulate
+for i in 1:n_sims
+    # Create SEIR strains
+    n_strains = Int(input_df.strains[i])
+    strains = Vector{SEIRModel}(undef, n_strains)
+    for i in 1:n_strains
+        strains[i] = SEIRModel(
+            input_df.transmission[i],
+            input_df.disease_mortality[i],
+            input_df.recovery[i],
+            round(Int, input_df.latency[i])
+        )
+    end
+    # Initialize population - everyone starts susceptible
+    initial_pop = Population(Individual[])
+    for i in 1:n_individuals
+        individual = Individual(n_strains, 1)  # age 1
+        push!(initial_pop.individuals, individual)
+    end
+    # Set simulation parameters
+    params = SimulationParameters(
+        strains,
+        matrices[i],
+        0.0, # base mortality
+        0.0, # fecundity
+        1, # Age of maturity
+        :simultaneous, # introduction of strains
+        100, # time steps
+        :density # transmission type
+    )
+
+    true_pop = simulate(initial_pop, params)
+
+    sampling_params = SamplingParameters(
+        1.0,
+        0.0,
+        0.0,
+    )
+
+    detections = sample_populations(true_pop, sampling_params)
+
+    epidemic_duration = sum(detections, dims = 1)
+
+    mean_epidemic_duration[i] = mean(epidemic_duration)
+end
+
+interaction_scores = CSV.read("Data/interaction_scores.csv", DataFrame)
+
+epidemic_duration_seir = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
+    @mutate(sim = 1:10000)
+    @left_join(interaction_scores, sim)
+end
+
+epidemic_duration_seir.mean_epidemic_duration = mean_epidemic_duration
+
+CSV.write("Data/epidemic_duration_seir.csv", epidemic_duration_seir)
+
+# Collect detection vectors
+mean_epidemic_duration_si = zeros(n_sims)
+
+# Simulate
+for i in 1:n_sims
+    # Create SI strains
+    n_strains = Int(input_df.strains[i])
+    strains = Vector{SIModel}(undef, n_strains)
+    for i in 1:n_strains
+        strains[i] = SIModel(
+            input_df.transmission[i],
+            input_df.disease_mortality[i],
+        )
+    end
+    # Initialize population - everyone starts susceptible
+    initial_pop = Population(Individual[])
+    for i in 1:n_individuals
+        individual = Individual(n_strains, 1)  # age 1
+        push!(initial_pop.individuals, individual)
+    end
+    # Set simulation parameters
+    params = SimulationParameters(
+        strains,
+        matrices[i],
+        0.0, # base mortality
+        0.0, # fecundity
+        1, # Age of maturity
+        :simultaneous, # introduction of strains
+        100, # time steps
+        :frequency # transmission type
+    )
+
+    true_pop = simulate(initial_pop, params)
+
+    sampling_params = SamplingParameters(
+        1.0,
+        0.0,
+        0.0,
+    )
+
+    detections = sample_populations(true_pop, sampling_params)
+
+    epidemic_duration = sum(detections, dims = 1)
+
+    mean_epidemic_duration_si[i] = mean(epidemic_duration)
+end
+
+interaction_scores = CSV.read("Data/interaction_scores.csv", DataFrame)
+
+epidemic_duration_si = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
+    @mutate(sim = 1:10000)
+    @left_join(interaction_scores, sim)
+end
+
+epidemic_duration_si.mean_epidemic_duration = mean_epidemic_duration_si
+
+CSV.write("Data/epidemic_duration_si.csv", epidemic_duration_si)
+```
+
+```{r epidemic_duration}
+library(tidyverse)
+library(here)
+library(GGally)
+
+epidemic_duration_seir <- read_csv(here("Data/epidemic_duration_seir.csv"))
+ggplot(epidemic_duration_seir, aes(x = mean_epidemic_duration)) +
+  geom_density() +
+  ggtitle("SEIR Epidemic Duration Distribution")
+epidemic_duration_si <- read_csv(here("Data/epidemic_duration_si.csv"))
+ggplot(epidemic_duration_si, aes(x = mean_epidemic_duration)) +
+  geom_density() +
+  ggtitle("SI Epidemic Duration Distribution")
+epidemic_duration_seir |>
+  mutate(
+    competition_score = total_competition / (strains^2),
+    facilitation_score = total_facilitation / (strains^2)
+  ) |>
+  select(
+    -cf_ratio,
+    -interaction_strength,
+    -total_competition,
+    -total_facilitation,
+    -sim,
+    -proportion_sampled,
+    -false_negative,
+    -priority_effects
+  ) |>
+  ggpairs()
 ```
 
 # Accumulation Curves
@@ -570,14 +729,14 @@ cumulative_detections_seir = @chain CSV.read("Data/simulation_round7_input.csv",
     @left_join(cumul_df, sim)
     @left_join(interaction_scores, sim)
     @mutate(
-        competition_score = total_competition/strains,
-        facilitation_score = total_facilitation/strains
+        competition_score = total_competition/(strains^2),
+        facilitation_score = total_facilitation/(strains^2)
     )
     @mutate(
         cf_cat = case_when(
-            facilitation_score - competition_score <= -1 => "high competition",
-            facilitation_score - competition_score <= 1 => "neutral", 
-            facilitation_score - competition_score > 1 => "high facilitation"
+            facilitation_score - competition_score <= -0.05 => "high competition",
+            facilitation_score - competition_score <= 0.05 => "neutral", 
+            facilitation_score - competition_score > 0.05 => "high facilitation"
         )
     )
 end
@@ -648,14 +807,14 @@ cumulative_detections_si = @chain CSV.read("Data/simulation_round7_input.csv", D
     @left_join(cumul_df, sim)
     @left_join(interaction_scores, sim)
     @mutate(
-        competition_score = total_competition/strains,
-        facilitation_score = total_facilitation/strains
+        competition_score = total_competition/(strains^2),
+        facilitation_score = total_facilitation/(strains^2)
     )
     @mutate(
         cf_cat = case_when(
-            facilitation_score - competition_score <= -1 => "high competition",
-            facilitation_score - competition_score <= 1 => "neutral", 
-            facilitation_score - competition_score > 1 => "high facilitation"
+            facilitation_score - competition_score <= -0.05 => "high competition",
+            facilitation_score - competition_score <= 0.05 => "neutral", 
+            facilitation_score - competition_score > 0.05 => "high facilitation"
         )
     )
 end

@@ -102,7 +102,7 @@ for i in 1:n_sims
             rand(Truncated(Normal(input_df.transmission[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.disease_mortality[i], 1), 0, 1)),
             rand(Truncated(Normal(input_df.recovery[i], 1), 0, 1)),
-            round(Int, rand(Truncated(Normal(input_df.latency[i], 1), 1, 10)))
+            rand(Truncated(Poisson(input_df.latency[i]), 1, 10))
         )
     end
     # Initialize population - everyone starts susceptible
@@ -643,7 +643,7 @@ epidemic_duration_si <- read_csv(here("Data/epidemic_duration_si.csv"))
 ggplot(epidemic_duration_si, aes(x = mean_epidemic_duration)) +
   geom_density() +
   ggtitle("SI Epidemic Duration Distribution")
-epidemic_duration_seir |>
+epidemic_duration_si |>
   mutate(
     competition_score = total_competition / (strains^2),
     facilitation_score = total_facilitation / (strains^2)

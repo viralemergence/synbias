@@ -18,13 +18,13 @@ using CSV
 using Tables
 using Tidier
 using MLJ
-using TidierPlots
+using Gadfly
 using BetaML
 using Shapley
 using CategoricalArrays
 using Arrow
 Random.seed!(18)
-n_sims = 10000
+n_sims = 15000
 ```
 
 # Simulation setup
@@ -34,7 +34,7 @@ n_sims = 10000
 The following parameters will change across simulations and will be sampled in a stratified manner:
 
 1.  Interaction strength (between strains), 0 - 0.5
-2.  Competition:facilitation ratio, 0.2 - 0.8
+2.  Competition:facilitation ratio, 0.1 - 0.9
 3.  Number of strains, 5 - 50
 4.  Proportion of the population sampled, 0 - 1
 5.  False negative rate, 0 - 0.5
@@ -45,7 +45,7 @@ The following parameters will change across simulations and will be sampled in a
 
 ```{julia variables}
 plan, _ = LHCoptim(n_sims, 9, 10)
-scaled_plan = scaleLHC(plan, [(0, 0.5), (0.2, 0.8), (5, 50), (0, 1),
+scaled_plan = scaleLHC(plan, [(0, 0.5), (0.1, 0.9), (5, 50), (0, 1),
     (0, 0.5), (0, 0.5), (0, 0.1), (1, 20), (0, 0.1)])
 ```
 
@@ -78,6 +78,12 @@ input_df = DataFrame(
 )
 CSV.write("Data/simulation_round7_input.csv", input_df)
 matrices = create_interaction_matrix(input_df)
+interaction_scores = DataFrame(
+    sim = 1:length(matrices),
+    total_facilitation = [sum(x[x .> 1] .- 1) for x in matrices],
+    total_competition = [sum(1 .- x[x .< 1]) for x in matrices]
+)
+CSV.write("Data/interaction_scores.csv", interaction_scores)
 ```
 
 # Simulation
@@ -204,11 +210,11 @@ CSV.write("Data/round7_si_output.csv",
 
 ```{julia analysis dataset}
 # Read the data back in
-input_parameters = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
-    @mutate(sim = 1:10000) # simulation IDs
-end
-simulation_output_seir = @chain CSV.read("Data/simulation_round7_output.csv", DataFrame, header=false) begin
-    @mutate(sim = 1:10000) # simulation IDs
+input_parameters = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+input_parameters.sim = 1:nrow(input_parameters)
+simulation_output_seir = CSV.read("Data/simulation_round7_output.csv", DataFrame, header=false)
+simulation_output_seir.sim = 1:nrow(simulation_output_seir)
+simulation_output_seir = @chain simulation_output_seir begin
     @pivot_longer(cols = 1:100,
         names_to = "timestep",
         values_to = "Detections")
@@ -224,9 +230,14 @@ for col in names(simulation_output_seir)
     end
 end
 
-ggplot(simulation_output_seir) +
-	geom_histogram(aes(x=:error_rate), bins=50) +
-	scale_y_log10()
+Gadfly.plot(
+    DataFrame(error_rate = collect(skipmissing(simulation_output_seir.error_rate))),
+    x = :error_rate,
+    Geom.histogram(bincount = 50),
+    Scale.y_log10,
+    Guide.xlabel("Error Rate"),
+    Guide.ylabel("Count")
+)
 ```
 
 This is like a negative exponential distribution of error rates for the density-dependent SEIR simulations.
@@ -234,11 +245,12 @@ This is like a negative exponential distribution of error rates for the density-
 Let's see how this looks for the SI simulation results:
 
 ```{julia histogram_si}
-input_parameters = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
-    @mutate(sim = 1:10000) # simulation IDs
-end
-simulation_output_si = @chain CSV.read("Data/round7_si_output.csv", DataFrame, header=false) begin
-    @mutate(sim = 1:10000) # simulation IDs
+
+input_parameters = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+input_parameters.sim = 1:nrow(input_parameters)
+simulation_output_si = CSV.read("Data/round7_si_output.csv", DataFrame, header=false)
+simulation_output_si.sim = 1:nrow(simulation_output_si)
+simulation_output_si = @chain simulation_output_si begin
     @pivot_longer(cols = 1:100,
         names_to = "timestep",
         values_to = "Detections")
@@ -254,9 +266,14 @@ for col in names(simulation_output_si)
     end
 end
 
-ggplot(simulation_output_si) +
-    geom_histogram(aes(x=:error_rate), bins=50) +
-    scale_y_log10()
+Gadfly.plot(
+    simulation_output_si,
+    x = :error_rate,
+    Geom.histogram(bincount = 50),
+    Scale.y_log10,
+    Guide.xlabel("Error Rate"),
+    Guide.ylabel("Count")
+)
 ```
 
 It seems that most of the samples result in no detections, which is to say an error rate of 1. I believe that this is due to the frequency-dependent nature of this simulation, based on my experimentation with different simulation settings.
@@ -273,10 +290,11 @@ library(stringr)
 library(vip)
 library(future)
 plan(multicore)
+n_sims <- 15000
 
-input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects")][, sim := 1:10000]
+input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects")][, sim := 1:n_sims]
 interaction_scores <- fread(here("Data/interaction_scores.csv"))
-simulation_output_seir <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:10000] |>
+simulation_output_seir <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:n_sims] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
@@ -344,9 +362,9 @@ library(stringr)
 library(vip)
 library(future)
 
-input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects", "recovery", "latency")][, sim := 1:10000]
+input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects", "recovery", "latency")][, sim := 1:n_sims]
 interaction_scores <- fread(here("Data/interaction_scores.csv"))
-simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:10000] |>
+simulation_output_si <- fread(here("Data/round7_si_output.csv"))[, sim := 1:n_sims] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
@@ -562,8 +580,9 @@ end
 
 interaction_scores = CSV.read("Data/interaction_scores.csv", DataFrame)
 
-epidemic_duration_seir = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
-    @mutate(sim = 1:10000)
+epidemic_duration_seir = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+epidemic_duration_seir.sim = 1:nrow(epidemic_duration_seir)
+epidemic_duration_seir = @chain epidemic_duration_seir begin
     @left_join(interaction_scores, sim)
 end
 
@@ -620,8 +639,9 @@ end
 
 interaction_scores = CSV.read("Data/interaction_scores.csv", DataFrame)
 
-epidemic_duration_si = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
-    @mutate(sim = 1:10000)
+epidemic_duration_si = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+epidemic_duration_si.sim = 1:nrow(epidemic_duration_si)
+epidemic_duration_si = @chain epidemic_duration_si begin
     @left_join(interaction_scores, sim)
 end
 
@@ -721,11 +741,12 @@ for sim in 1:n_sims
     cumulative_detections[sim] = sum(detection_by_strain)/n_strains
 end
 
-cumul_df = DataFrame(sim = 1:10000, cumulative_detections = cumulative_detections)
+cumul_df = DataFrame(sim = 1:n_sims, cumulative_detections = cumulative_detections)
 interaction_scores = CSV.read("Data/interaction_scores.csv", DataFrame)
 
-cumulative_detections_seir = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
-    @mutate(sim = 1:10000) # simulation IDs
+cumulative_detections_seir = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+cumulative_detections_seir.sim = 1:nrow(cumulative_detections_seir)
+cumulative_detections_seir = @chain cumulative_detections_seir begin
     @left_join(cumul_df, sim)
     @left_join(interaction_scores, sim)
     @mutate(
@@ -745,13 +766,13 @@ cumulative_detections_seir.cf_cat = CategoricalArray(cumulative_detections_seir.
                                    levels = ["high competition", "neutral", "high facilitation"],
                                    ordered = true)
 
-p1 = ggplot(cumulative_detections_seir, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
-    geom_point(alpha = 0.1) +
-    geom_smooth(linewidth = 20) +
-    scale_y_continuous(name = "Proportion of Parasite Species Detected") +
-    scale_x_continuous(name = "Proportion of Host Population Sampled") +
-    labs(color = "Interaction Type", title = "Species Accumulation Curve: SEIR model") +
-    scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
+p1 = @ggplot(cumulative_detections_seir, aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat, group = cf_cat)) +
+    @geom_point(alpha = 0.1) +
+    @geom_smooth(method = "loess", se = false) +
+    @scale_y_continuous(name = "Proportion of Parasite Species Detected") +
+    @scale_x_continuous(name = "Proportion of Host Population Sampled") +
+    @labs(color = "Interaction Type", title = "Species Accumulation Curve: SEIR model") +
+    @scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
 
 CSV.write("Data/seir_cumulative_detection.csv", cumulative_detections_seir)
 
@@ -800,35 +821,36 @@ for sim in 1:n_sims
     cumulative_detections_si[sim] = sum(detection_by_strain)/n_strains
 end
 
-cumul_df = DataFrame(sim = 1:10000, cumulative_detections = cumulative_detections_si)
+cumul_df = DataFrame(sim = 1:n_sims, cumulative_detections = cumulative_detections_si)
 
-cumulative_detections_si = @chain CSV.read("Data/simulation_round7_input.csv", DataFrame) begin
-    @mutate(sim = 1:10000) # simulation IDs
-    @left_join(cumul_df, sim)
-    @left_join(interaction_scores, sim)
-    @mutate(
-        competition_score = total_competition/(strains^2),
-        facilitation_score = total_facilitation/(strains^2)
-    )
-    @mutate(
-        cf_cat = case_when(
-            facilitation_score - competition_score <= -0.05 => "high competition",
-            facilitation_score - competition_score <= 0.05 => "neutral", 
-            facilitation_score - competition_score > 0.05 => "high facilitation"
+cumulative_detections_si = CSV.read("Data/simulation_round7_input.csv", DataFrame)
+cumulative_detections_si.sim = 1:nrow(cumulative_detections_si)
+cumulative_detections_si = @chain cumulative_detections_si begin
+        @left_join(cumul_df, sim)
+        @left_join(interaction_scores, sim)
+        @mutate(
+            competition_score = total_competition/(strains^2),
+            facilitation_score = total_facilitation/(strains^2)
         )
-    )
-end
+        @mutate(
+            cf_cat = case_when(
+                facilitation_score - competition_score <= -0.05 => "high competition",
+                facilitation_score - competition_score <= 0.05 => "neutral", 
+                facilitation_score - competition_score > 0.05 => "high facilitation"
+            )
+        )
+    end
 
 cumulative_detections_si.cf_cat = CategoricalArray(cumulative_detections_si.cf_cat, 
                                    levels = ["high competition", "neutral", "high facilitation"],
                                    ordered = true)
 
-p2 = ggplot(cumulative_detections_si, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
-    geom_point(alpha = 0.1) +
-    geom_smooth(linewidth = 3) +
-    scale_y_continuous(name = "Proportion of Parasite Species Detected") +
-    scale_x_continuous(name = "Proportion of Host Population Sampled") +
-    labs(color = "Interaction Type", title = "Species Accumulation Curve: SI model") +
+p2 = @ggplot(cumulative_detections_si, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
+    @geom_point(alpha = 0.1) +
+    @geom_smooth(linewidth = 3) +
+    @scale_y_continuous(name = "Proportion of Parasite Species Detected") +
+    @scale_x_continuous(name = "Proportion of Host Population Sampled") +
+    @labs(color = "Interaction Type", title = "Species Accumulation Curve: SI model") +
     scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
 
 CSV.write("Data/si_cumulative_detection.csv", cumulative_detections_si)

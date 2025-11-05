@@ -760,19 +760,20 @@ cumulative_detections_seir = @chain cumulative_detections_seir begin
             facilitation_score - competition_score > 0.05 => "high facilitation"
         )
     )
+    dropmissing()
 end
 
 cumulative_detections_seir.cf_cat = CategoricalArray(cumulative_detections_seir.cf_cat, 
                                    levels = ["high competition", "neutral", "high facilitation"],
                                    ordered = true)
 
-p1 = @ggplot(cumulative_detections_seir, aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat, group = cf_cat)) +
-    @geom_point(alpha = 0.1) +
-    @geom_smooth(method = "loess", se = false) +
-    @scale_y_continuous(name = "Proportion of Parasite Species Detected") +
-    @scale_x_continuous(name = "Proportion of Host Population Sampled") +
-    @labs(color = "Interaction Type", title = "Species Accumulation Curve: SEIR model") +
-    @scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
+p1 = ggplot(cumulative_detections_seir, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
+    geom_point(alpha = 0.1) +
+    geom_smooth(method = "loess", linewidth=3) +
+    scale_y_continuous(name = "Proportion of Parasite Species Detected") +
+    scale_x_continuous(name = "Proportion of Host Population Sampled") +
+    labs(color = "Interaction Type", title = "Species Accumulation Curve: SEIR model") +
+    scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
 
 CSV.write("Data/seir_cumulative_detection.csv", cumulative_detections_seir)
 
@@ -845,12 +846,14 @@ cumulative_detections_si.cf_cat = CategoricalArray(cumulative_detections_si.cf_c
                                    levels = ["high competition", "neutral", "high facilitation"],
                                    ordered = true)
 
-p2 = @ggplot(cumulative_detections_si, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
-    @geom_point(alpha = 0.1) +
-    @geom_smooth(linewidth = 3) +
-    @scale_y_continuous(name = "Proportion of Parasite Species Detected") +
-    @scale_x_continuous(name = "Proportion of Host Population Sampled") +
-    @labs(color = "Interaction Type", title = "Species Accumulation Curve: SI model") +
+cumulative_detections_si = dropmissing(cumulative_detections_si)
+
+p2 = ggplot(cumulative_detections_si, @aes(x = proportion_sampled, y = cumulative_detections, color = cf_cat)) +
+    geom_point(alpha = 0.1) +
+    geom_smooth(linewidth = 3) +
+    scale_y_continuous(name = "Proportion of Parasite Species Detected") +
+    scale_x_continuous(name = "Proportion of Host Population Sampled") +
+    labs(color = "Interaction Type", title = "Species Accumulation Curve: SI model") +
     scale_color_manual(values = ["#BB5566FF", "#DDAA33FF", "#004488FF"])
 
 CSV.write("Data/si_cumulative_detection.csv", cumulative_detections_si)

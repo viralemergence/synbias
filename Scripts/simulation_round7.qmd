@@ -63,6 +63,8 @@ The following parameters will remain constant across all simulations:
 
 I can create interaction matrices for all the simulations using the `prep_interaction_matrix` function from `CoinfectionSimulator.jl`.
 
+I also calculate here the total competition and the total facilitation, which is the sum of the deviations less than 1 and the sum of the deviations more than 1, respectively.
+
 ```{julia prep interaction matrices}
 input_df = DataFrame(
     interaction_strength=scaled_plan[:, 1],
@@ -208,6 +210,8 @@ CSV.write("Data/round7_si_output.csv",
 
 ## Distribution of Error rates
 
+There are error rates in the detection of strains. How are they distributed?
+
 ```{julia analysis dataset}
 # Read the data back in
 input_parameters = CSV.read("Data/simulation_round7_input.csv", DataFrame)
@@ -239,8 +243,6 @@ Gadfly.plot(
     Guide.ylabel("Count")
 )
 ```
-
-This is like a negative exponential distribution of error rates for the density-dependent SEIR simulations.
 
 Let's see how this looks for the SI simulation results:
 
@@ -276,11 +278,9 @@ Gadfly.plot(
 )
 ```
 
-It seems that most of the samples result in no detections, which is to say an error rate of 1. I believe that this is due to the frequency-dependent nature of this simulation, based on my experimentation with different simulation settings.
-
 ## Sensitivity Analysis
 
-Now I will use a machine learning algorithm to find which input parameters affect the error rate the most. First I will do it for the SEIR simulations:
+Now I will use a machine learning algorithm to find which input parameters affect the error rate the most. I have commented out the code for tuning the hyperparameters because it takes a long time to run, and skip straight to running the algorithm on the best hyperparameters I found. First I will do it for the SEIR simulations:
 
 ```{r sensitivity_analysis_seir}
 library(data.table)
@@ -352,7 +352,7 @@ final_fit_seir |>
     vip()
 ```
 
-In the end, a very interesting result. The strong effects of timestep, number of strains, false negative rate, and proportion sampled were expected. It's interesting that C:F ratio is more important to the error rate than transmission or recovery.
+In the end, a very interesting result. The strong effects of timestep, number of strains, false negative rate, and proportion sampled were expected. It's interesting that facilitation score (total facilitation divided by the number of pairwise interactions) and the competition score (total competition divided by the number of pairwise interactions) are both more important than transmission in the detectability of strains.
 
 ```{r sensitivity_analysis_si}
 library(data.table)
@@ -406,7 +406,7 @@ final_fit_si |>
     vip()
 ```
 
-Intriguingly, competition and facilitation scores are nearly insignificant in the frequency-dependent SI simulations. The most important parameters are number of strains, and timestep.
+Intriguingly, competition and facilitation scores are nearly insignificant in the frequency-dependent SI simulations, as are all the epidemiological parameters. The most important parameters are number of strains, and timestep.
 
 Let's examine these results more closely using plots of Shapley values.
 
@@ -522,7 +522,7 @@ ggsave(filename = "Figures/Fig3_shapley.png", width = 10, height = 12, units = "
 
 ## Epidemic Duration
 
-I think that epidemic duration explains a lot about the results I've seen here so far. The error rate depends on epidemic duration (how many timesteps the outbreaks are active) and epidemic duration is affected by the simulation parameters. I'm going to test this by measuring epidemic duration across simulations.
+I think this is interesting to look into, as something that can be affected by competition and facilitation.
 
 ```{julia epidemic_duration}
 input_df = CSV.read("Data/simulation_round7_input.csv", DataFrame)
@@ -862,7 +862,7 @@ ggsave(p2, "Figures/Fig2b_si_species.png")
 ggsave(p1, "Figures/Fig2a_seir_species.png")
 ```
 
-The results don't amount to much, mainly because cutting up the C:F ratio into gross categories like this doesn't really capture the non-linear relationship between C:F ratio, interaction strength, and error rate that you can observe in the Shapley plots above.
+The results don't amount to much, mainly because cutting up competition and facilitation into gross categories like this doesn't really capture the non-linear relationship between competition, facilitation, interaction strength, and error rate that you can observe in the Shapley plots above.
 
 ## Interaction Accumulation Curves
 
@@ -973,3 +973,5 @@ test_matrix <- handle_site_species_matrix(
   "Data/seir_site_species_matrices/sim_1_timestep_1.arrow"
 )
 ```
+
+It's very difficult to detect any interactions in these data using these particular methods.

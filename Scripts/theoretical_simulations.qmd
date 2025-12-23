@@ -144,7 +144,7 @@ for sim in 1:n_sims
     results[sim, :] = sum(detections, dims=2)
 end
 
-CSV.write("Data/simulation_round7_output.csv",
+CSV.write("Data/round7_seir_output.csv",
     Tables.table(results),
     writeheader=false)
 ```
@@ -304,7 +304,7 @@ n_sims <- 15000
 
 input_parameters <- fread(here("Data/simulation_round7_input.csv"))[, -c("priority_effects")][, sim := 1:n_sims]
 interaction_scores <- fread(here("Data/interaction_scores.csv"))
-simulation_output_seir <- fread(here("Data/simulation_round7_output.csv"))[, sim := 1:n_sims] |>
+simulation_output_seir <- fread(here("Data/round7_seir_output.csv"))[, sim := 1:n_sims] |>
     melt(data = _, id.vars = "sim", measure_vars = 1:100, variable.name = "timestep", value.name = "Detections") |>
     _[, timestep := as.numeric(str_sub(timestep, 2))] |>
     merge(x = _, y = input_parameters, by = "sim") |>
@@ -416,7 +416,7 @@ final_fit_si |>
     vip()
 ```
 
-Intriguingly, competition and facilitation scores are nearly insignificant in the frequency-dependent SI simulations, as are all the epidemiological parameters. The most important parameters are number of strains, and timestep.
+Intriguingly, competition and facilitation scores are low importance in the frequency-dependent SI simulations, as are all the epidemiological parameters. The most important parameters are number of strains, and timestep.
 
 Let's examine these results more closely using plots of Shapley values.
 
@@ -884,8 +884,6 @@ CSV.write("Data/si_cumulative_detection.csv", cumulative_detections_si)
 p1 |> PNG("Figures/Fig2a_seir_species.png", 6inch, 4.5inch)
 p2 |> PNG("Figures/Fig2b_si_species.png", 6inch, 4.5inch)
 ```
-
-The results don't amount to much, mainly because cutting up competition and facilitation into gross categories like this doesn't really capture the non-linear relationship between competition, facilitation, interaction strength, and error rate that you can observe in the Shapley plots above.
 
 ## Interaction Accumulation Curves
 

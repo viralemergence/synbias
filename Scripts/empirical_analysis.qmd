@@ -45,6 +45,7 @@ daphnia <- readxl::read_excel(
         "numeric",
         "numeric",
         "text",
+        "text",
         "numeric",
         "text",
         "numeric",
@@ -509,9 +510,10 @@ gp_model |>
         y = "Estimate"
     ) +
     theme_minimal()
+ggsave(here("Figures/supp_fig2_empirical_snail_fixed_effects.png"), width = 8, height = 4)
 ```
 
-I'm frankly suspicious of these results as they stand; how could sample size not affect bias? The correlogram clearly shows a relationship.
+I'm frankly suspicious of these results as they stand; how could sample size not affect bias? The correlogram clearly shows a relationship. There is likely an issue with the model; consult with collaborators for advice.
 
 Another idea I want to explore is to fit species accumulation curves to the number of competitive and facilitative pairs and use them to calculate how many snails one needs to sample in order to find all of the pairs.
 
@@ -730,7 +732,7 @@ facilitative_pairs |>
     summarize(n = n())
 ```
 
-Most of the time, the facilatitive pair is *Euhaplorchis californiensis* and small cyathocotylid trematodes (7/10 pairs). There are also 2 instances of *E. californiensis* and *Renicola buchanani* being facilitative, and one instance of *E. californiensis* and *Austrobilharzia* sp. being facilitative.
+There are a few facilitative pairs, which matches laboratory findings about secondary invaders in this system.
 
 Now let's look at the competitive pairs, which should be well-established from lab experiments, though many of them only occur once across sites.
 
@@ -766,9 +768,13 @@ daphnia_data_prep <- function(df) {
         select(id = `data order`, Parasite, presence) |>
         distinct() |>
         mutate(
-            presence = presence == "u",
+            presence = presence != "u",
             Parasite = str_split_i(Parasite, " ", 1)
         ) |>
+        filter(
+            Parasite != "UGP",
+            Parasite != "GPB"
+        ) |> 
         pivot_wider(
             names_from = Parasite, # The species names become columns
             values_from = presence, # TRUE/FALSE based on presence
@@ -776,6 +782,11 @@ daphnia_data_prep <- function(df) {
             id_cols = id,
             id_expand = TRUE
         ) |>
+        mutate(
+            `B. paedophthorum` = BP | BC,
+            `Spider_oomycete` = POD | SM
+        ) |> 
+        select(-BP, -BC, -POD, -SM) |>
         column_to_rownames(var = "id") |>
         as.matrix() |>
         t()
@@ -785,7 +796,7 @@ cooccurrence_matrices <- daphnia |>
     group_split() |>
     map(daphnia_data_prep)
 cooccurrence_analyses <- cooccurrence_matrices |>
-    map(\(m) quiet(cooccur(m, thresh = T, spp_names = TRUE, prob = "comb")))
+    map(possibly(\(m) quiet(cooccur(m, thresh = T, spp_names = TRUE, prob = "comb")), otherwise = NULL))
 ```
 
 ```{r plot daphnia associations}
@@ -793,9 +804,11 @@ daphnia |>
     group_by(lake, `date collected`) |>
     group_keys() |>
     mutate(
-        positive = map_int(cooccurrence_analyses, "positive"),
-        negative = map_int(cooccurrence_analyses, "negative")
+        idx = seq_len(n()),
+        positive = map_int(idx, ~if_else(!is.null(cooccurrence_analyses[[.x]]), nrow(cooccurrence_analyses[[.x]]$results[cooccurrence_analyses[[.x]]$results$p_gt < 0.05, ]) %||% 0L, 0L)),
+        negative = map_int(idx, ~if_else(!is.null(cooccurrence_analyses[[.x]]), nrow(cooccurrence_analyses[[.x]]$results[cooccurrence_analyses[[.x]]$results$p_lt < 0.05, ]) %||% 0L, 0L))
     ) |>
+    select(-idx) |>
     pivot_longer(
         cols = c(positive, negative),
         names_to = "association",
@@ -808,7 +821,7 @@ daphnia |>
     theme_bw()
 ```
 
-This result is very different from the snail/trematode system. The associations are much more likely to be neutral, and there doesn't seem to be any salient difference in positive vs. negative associations.
+This result is very different from the snail/trematode system. Very few associations are detected in Daphnia.
 
 ## By Species
 
@@ -816,17 +829,31 @@ Again, I want to look at the specific species pairs involved here and get a sens
 
 ```{r daphnia consistency}
 facilitative_pairs_daphnia <- cooccurrence_analyses |>
+    discard(is.null) |> 
     map("results") |>
     map(\(df) df |> filter(p_gt < 0.05)) |>
     map(\(df) select(df, sp1_name, sp2_name)) |>
     bind_rows()
 competitive_pairs_daphnia <- cooccurrence_analyses |>
+    discard(is.null) |> 
     map("results") |>
     map(\(df) df |> filter(p_lt < 0.05)) |>
     map(\(df) select(df, sp1_name, sp2_name)) |>
     bind_rows()
 facilitative_pairs_daphnia
 competitive_pairs_daphnia
+sig_pairs <- which(!map_lgl(cooccurrence_analyses, is.null)) |> 
+    map_lgl(function(i) {
+        rows <- cooccurrence_analyses[[i]]$results |> 
+            filter(p_gt < 0.05 | p_lt < 0.05) |> 
+            nrow()
+        rows > 0
+    }) |> which()
+daphnia |>
+    group_by(lake, `date collected`) |>
+    group_keys() |> 
+    dplyr::slice(which(!map_lgl(cooccurrence_analyses, is.null))[sig_pairs])
+
 ```
 
 These results indicate that there are very few species pairs that are competitive or facilitative across sites and times (two competitive pairs and three facilitative pairs). This seems to be because the sample sizes are much lower:

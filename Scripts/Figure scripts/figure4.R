@@ -30,6 +30,7 @@ daphnia <- readxl::read_excel(
     "numeric",
     "numeric",
     "text",
+    "text",
     "numeric",
     "text",
     "numeric",
@@ -208,8 +209,12 @@ daphnia_data_prep <- function(df) {
     select(id = `data order`, Parasite, presence) |>
     distinct() |>
     mutate(
-      presence = presence == "u",
+      presence = presence != "u",
       Parasite = str_split_i(Parasite, " ", 1)
+    ) |>
+    filter(
+      Parasite != "UGP",
+      Parasite != "GPB"
     ) |>
     pivot_wider(
       names_from = Parasite, # The species names become columns
@@ -218,6 +223,11 @@ daphnia_data_prep <- function(df) {
       id_cols = id,
       id_expand = TRUE
     ) |>
+    mutate(
+      `B. paedophthorum` = BP | BC,
+      `Spider_oomycete` = POD | SM
+    ) |>
+    select(-BP, -BC, -POD, -SM) |>
     column_to_rownames(var = "id") |>
     as.matrix() |>
     t()
@@ -227,13 +237,37 @@ cooccurrence_matrices <- daphnia |>
   group_split() |>
   map(daphnia_data_prep)
 cooccurrence_analyses <- cooccurrence_matrices |>
-  map(\(m) quiet(cooccur(m, thresh = T, spp_names = TRUE, prob = "comb")))
+  map(possibly(
+    \(m) quiet(cooccur(m, thresh = T, spp_names = TRUE, prob = "comb")),
+    otherwise = NULL
+  ))
 p2 <- daphnia |>
   group_by(lake, `date collected`) |>
   group_keys() |>
   mutate(
-    positive = map_int(cooccurrence_analyses, "positive"),
-    negative = map_int(cooccurrence_analyses, "negative")
+    idx = seq_len(n()),
+    positive = map_int(
+      idx,
+      ~ if_else(
+        !is.null(cooccurrence_analyses[[.x]]),
+        nrow(cooccurrence_analyses[[.x]]$results[
+          cooccurrence_analyses[[.x]]$results$p_gt < 0.05,
+        ]) %||%
+          0L,
+        0L
+      )
+    ),
+    negative = map_int(
+      idx,
+      ~ if_else(
+        !is.null(cooccurrence_analyses[[.x]]),
+        nrow(cooccurrence_analyses[[.x]]$results[
+          cooccurrence_analyses[[.x]]$results$p_lt < 0.05,
+        ]) %||%
+          0L,
+        0L
+      )
+    )
   ) |>
   pivot_longer(
     cols = c(positive, negative),
@@ -243,7 +277,7 @@ p2 <- daphnia |>
   ggplot() +
   geom_histogram(
     aes(x = count, fill = Association),
-    bins = 2,
+    bins = 3,
     position = "dodge"
   ) +
   xlab("Number of Associations per Site/Month") +
@@ -252,6 +286,6 @@ p2 <- daphnia |>
   ) +
   theme_minimal() +
   scale_fill_manual(values = c("#EF7C12FF", "#007BC3FF")) +
-  scale_x_continuous(breaks = c(0, 1))
+  scale_x_continuous(breaks = c(0, 1, 2))
 p1 / p2
-ggsave(filename = "Figures/Fig4_empirical_summary.png")
+ggsave(filename = "Figures/Fig4_empirical_summary.png", width = 10, height = 10)

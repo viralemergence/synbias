@@ -21,9 +21,13 @@ p1 = plot(
 	Layout(
 		title = "Species & Interaction Accumulation Curves",
 		xaxis = attr(title = "Number of Sampling Units", showticklabels = false, showgrid = false),
-		yaxis = attr(title = "Number of Species Detected", showticklabels = false, showgrid = false),
+		yaxis = attr(title = "Proportion of Total Species Detected", 
+					 titlefont = attr(size = 11),
+					 showticklabels = false, 
+					 showgrid = false),
 		yaxis2 = attr(
-			title = "Number of Interactions Detected",
+			title = "Proportion of Total Interactions Detected",
+			titlefont = attr(size = 11),
 			overlaying = "y",
 			side = "right",
 			showticklabels = false,

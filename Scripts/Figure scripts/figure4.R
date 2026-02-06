@@ -153,31 +153,58 @@ trematode_stats <- snail |>
   filter(!is.na(infection_intensity)) |>
   group_by(site) |>
   summarize(sum_infection_intensity = sum(infection_intensity))
-df_cf <- snail |>
-  pivot_longer(
-    cols = starts_with("trematode"),
-    names_to = "trematode_survey",
-    values_to = "trematode"
+df_cf <- data.frame(
+  facilitative = map_int(facilitative_pairs, nrow),
+  competitive = -map_int(competitive_pairs, nrow)
+) |>
+  bind_cols(
+    snail |>
+      group_by(site) |>
+      summarize(sample_size = n())
   ) |>
-  filter(trematode %in% trematodes) |>
-  group_by(site) |>
-  summarize(true_species_richness = n_distinct(trematode)) |>
-  ungroup() |>
   mutate(
-    facilitative_pairs = map_int(facilitative_pairs, nrow),
-    competitive_pairs = map_int(competitive_pairs, nrow)
-  ) |>
-  left_join(trematode_stats, by = join_by(site))
+    site = factor(
+      site,
+      levels = c(
+        "c2",
+        "c3",
+        "c6",
+        "c7",
+        "c8",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f1 (original)",
+        "f5 (original)"
+      ),
+      labels = c(
+        "c2",
+        "c3",
+        "c6",
+        "c7",
+        "c8",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f1\n(original)",
+        "f5\n(original)"
+      )
+    )
+  )
 p1 <- df_cf |>
   ggplot(aes(x = site)) +
   geom_col(
-    aes(y = facilitative_pairs),
+    aes(y = facilitative),
     fill = "#007BC3FF",
     alpha = 0.7,
     width = 0.6
   ) +
   geom_col(
-    aes(y = -1 * competitive_pairs),
+    aes(y = competitive),
     fill = "#EF7C12FF",
     alpha = 0.7,
     width = 0.6
@@ -193,10 +220,12 @@ p1 <- df_cf |>
   theme_minimal() +
   geom_text(
     aes(
-      label = paste0("Species:\n", true_species_richness),
-      y = facilitative_pairs + 1.5
+      label = paste0("n=", sample_size),
+      y = facilitative + 1.5
     ),
-    position = position_dodge(0.9)
+    position = position_dodge(0.9),
+    vjust = 0,
+    size = 3
   )
 
 daphnia_data_prep <- function(df) {
@@ -272,15 +301,15 @@ p2 <- daphnia |>
   pivot_longer(
     cols = c(positive, negative),
     names_to = "Association",
-    values_to = "count"
+    values_to = "Count"
   ) |>
   ggplot() +
   geom_histogram(
-    aes(x = count, fill = Association),
+    aes(x = Count, fill = Association),
     bins = 3,
     position = "dodge"
   ) +
-  xlab("Number of Associations per Site/Month") +
+  xlab("Number of Associations per Site/Time") +
   ggtitle(
     bquote(bold("B.") ~ "Species Associations in" ~ italic("Daphnia"))
   ) +

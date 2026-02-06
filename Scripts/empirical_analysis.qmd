@@ -175,10 +175,16 @@ facilitative_pairs <- cooccurrence_analyses |>
             select(sp1_name, sp2_name, obs_cooccur, exp_cooccur, p_gt)
     })
 data.frame(
-    site = unique(snail$site),
     facilitative = map_int(facilitative_pairs, nrow),
     competitive = -map_int(competitive_pairs, nrow)
 ) |>
+    bind_cols(snail |>
+        group_by(site) |>
+        summarize(sample_size = n())) |> 
+mutate(
+    site = factor(site, levels = c("c2", "c3", "c6", "c7", "c8", "f1", "f2", "f3", "f4", "f5", "f1 (original)", "f5 (original)")),
+    label_y = facilitative + 0.3
+) |> 
     ggplot(aes(x = site)) +
     geom_col(
         aes(y = facilitative),
@@ -188,11 +194,13 @@ data.frame(
     ) +
     geom_col(aes(y = competitive), fill = "#007BC3FF", alpha = 0.7, width = 0.6) +
     geom_hline(yintercept = 0, color = "black", linewidth = 1) +
+    geom_text(aes(y = label_y, label = paste0("n=", sample_size)), vjust = 0, size = 3) +
     labs(
         title = "Facilitative vs Competitive Interactions by Site",
         x = "Site",
         y = "Count (Facilitative above, Competitive below)"
     ) +
+    scale_x_discrete(labels = c("c2", "c3", "c6", "c7", "c8", "f1", "f2", "f3", "f4", "f5", "f1\n(original)", "f5\n(original)")) +
     theme_minimal()
 ```
 
